@@ -5,12 +5,19 @@
 #define STDLINESIZE 128
 
 char* read_line();
+char** parse_args(char* args);
 
 int main() {
     char* arg;
+    char** args; 
     while(strcmp(arg = read_line(), "exit")) {
         printf("%s\n", arg);
+        args = parse_args(arg);
+        if (!strcmp(args[1], "recover")) {
+           printf("found recover\n"); 
+        }
     }
+    free(args);
     free(arg);
 }
 
@@ -38,3 +45,6 @@ char* read_line() {
         }
     }
 }
+
+
+//TODO: rewrite parseargs using strtok
