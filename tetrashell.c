@@ -5,19 +5,42 @@
 #define STDLINESIZE 128
 
 char* read_line();
-char** parse_args(char* args);
+char** parse_args(char* args){
+    char** buffed = malloc(sizeof(char*));
+    int size = 1;
+    char* created;
+    int i;
+    i = 0;
+    created = strtok(args, " ");
+    while (created != NULL) {
+	    if (i >= size) {
+              size *= 2;
+	      buffed = realloc(buffed, size*sizeof(char*));
+	    }
+	    buffed[i] = strdup(created);
+	    printf("%s\n", created);
+	    created = strtok(NULL, " ");
+	    i++;
+    }
+    if (i >= size) {
+       buffed = realloc(buffed, (size + 1)*sizeof(char*));
+    }
+    buffed[i] = NULL;
+    return buffed;
+}
 
 int main() {
     char* arg;
     char** args; 
     while(strcmp(arg = read_line(), "exit")) {
-        printf("%s\n", arg);
+        //printf("%s\n", arg);
         args = parse_args(arg);
-        if (!strcmp(args[1], "recover")) {
-           printf("found recover\n"); 
+        if (!strcmp(args[0], "recover")) {
+           printf("found recover\n");
+	   break; 
         }
+	free(args);
     }
-    free(args);
     free(arg);
 }
 
@@ -44,7 +67,7 @@ char* read_line() {
             idx++;
         }
     }
+    return buffer;
 }
 
 
-//TODO: rewrite parseargs using strtok
