@@ -8,6 +8,7 @@ char* read_line();
 char** parse_args(char* args);
 char* welcome();
 void print_image(FILE *fptr);
+void check_buffer(void* buffer, char* output_text); 
 
 int main() {
     char* arg;
@@ -15,10 +16,11 @@ int main() {
 
     char* pathname = welcome();
 
-    //init loop 
-    printf("tetrashell> ");
-    arg = read_line();
-    while(strcmp(arg, "exit")) {
+    /* MAIN LOOP */
+    int first_loop = 1; 
+    while(first_loop || strcmp(arg, "exit")) {
+
+        first_loop = 0;
 
         args = parse_args(arg);
         if (!strcmp(args[0], "recover")) {
@@ -27,7 +29,6 @@ int main() {
         }
 	    free(args);
 
-        //run next
         printf("tetrashell> ");
         arg = read_line();
     }
@@ -62,15 +63,10 @@ void print_image(FILE * imgpath) {
 }
 
 char* read_line() {
-    int line_size = STDLINESIZE;
+    int line_size = STDLINESIZE, idx = 0, ch;
     char* buffer = malloc(sizeof(char) * line_size);
-    int idx = 0;
-    int ch;
+    check_buffer(buffer, "malloc failed in read_line!");
 
-    if (!buffer) {
-        fprintf(stderr, "allocation error in read_line");
-        exit(EXIT_FAILURE);
-    }
 
     while (1) {
         ch = getchar();
@@ -82,12 +78,19 @@ char* read_line() {
             buffer[idx] = ch;
             idx++;
         }
+
+        if (idx >= line_size) {
+            line_size *= 2;
+            buffer = realloc(buffer, sizeof(char) * line_size);
+            check_buffer(buffer, "read_line buffer realloc failed!");
+        }
     }
     return buffer;
 }
 
 char** parse_args(char* args){
     char** buffed = malloc(sizeof(char*));
+    check_buffer(buffed, "malloc failed in parse_args!");
     int size = 1, i = 0;
     char* created;
     created = strtok(args, " ");
@@ -95,6 +98,7 @@ char** parse_args(char* args){
 	    if (i >= size) {
               size *= 2;
 	      buffed = realloc(buffed, size*sizeof(char*));
+          check_buffer(buffed, "realloc failed in parse_args!");
 	    }
 	    buffed[i] = strdup(created);
 	    created = strtok(NULL, " ");
@@ -102,9 +106,15 @@ char** parse_args(char* args){
     }
     if (i >= size) {
        buffed = realloc(buffed, (size + 1)*sizeof(char*));
+       check_buffer(buffed, "realloc failed in parse_args!");
     }
     buffed[i] = NULL;
     return buffed;
 }
 
-
+void check_buffer(void* buffer, char* output_text) {
+    if (!buffer) {
+        fprintf(stderr, "%s\n", output_text);
+        exit(EXIT_FAILURE);
+    }
+}
