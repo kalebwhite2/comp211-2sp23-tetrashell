@@ -13,14 +13,13 @@ void check_buffer(void* buffer, char* output_text);
 int main() {
     char* arg;
     char** args; 
-
+    
+    /* FIND SAVE FILE */
     char* pathname = welcome();
 
     /* MAIN LOOP */
-    int first_loop = 1; 
-    while(first_loop || strcmp(arg, "exit")) {
-
-        first_loop = 0;
+    
+    while(strcmp((arg = read_line()), "exit")) {
 
         args = parse_args(arg);
         if (!strcmp(args[0], "recover")) {
@@ -28,11 +27,9 @@ int main() {
 	       break; 
         }
 	    free(args);
-
-        printf("tetrashell> ");
-        arg = read_line();
     }
-
+    
+    free(pathname);
     free(arg);
 }
 
@@ -48,7 +45,10 @@ char* welcome() {
 
     printf("WELCOME TO TETRASHELL\nTHE SHELL OF YOUR DREAMS\nENTER THE PATH TO YOUR QUICKSAVE: \n");
 
-    char* pathname = read_line(); 
+    //getline will automatically resize pathname if necessary
+    char* pathname = malloc(256); 
+    size_t pathsize = 256;
+    getline(&pathname, &pathsize, stdin);
     
     return pathname;
 }
@@ -67,7 +67,8 @@ char* read_line() {
     char* buffer = malloc(sizeof(char) * line_size);
     check_buffer(buffer, "malloc failed in read_line!");
 
-
+    printf("tetrashell> ");
+    
     while (1) {
         ch = getchar();
 
