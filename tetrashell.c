@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h> 
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define STDLINESIZE 128
 
@@ -32,10 +34,15 @@ char** parse_args(char* args){
 int main() {
     char* arg;
     char** args; 
+    pid_t pid;
     while(strcmp(arg = read_line(), "exit")) {
         //printf("%s\n", arg);
         args = parse_args(arg);
         if (!strcmp(args[0], "recover")) {
+	   pid = fork();
+	   if (pid == 0) {
+	   	execve("/playpen/a5/recover"	
+	   }	   
            printf("found recover\n");
 	   break; 
         }
