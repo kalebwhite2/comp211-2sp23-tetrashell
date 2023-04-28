@@ -33,7 +33,7 @@ int main() {
     while(strcmp((arg = read_line(game, pathname)), "exit")) {
 	char* arg_copy = strdup(arg);
    	args = parse_args(arg_copy);
-        if (!strcmp(args[0], "recover")) {
+        if (!strcmp(args[0], "recover") || !strcmp(args[0], "rec") ) {
 	 // p1[2];
 	 // if (pipe(p1) < 0} {
  	  //    return(EXIT_FAILURE);
@@ -60,10 +60,34 @@ int main() {
            }
 	   free(args2);
 	 }
+	 if (!strcmp(args[0], "help")) {
+           if (!strcmp(args[1], "modify")) {
+             printf("This command calls the `modify` program with the current quicksave to modify either the score or lines, given as the second argument, to a certain value given as the third argument.\n");
+           }
+	   if (!strcmp(args[1], "check")) {
+             printf("This command calls the `check` program with the current quicksave to verify if it will pass legitimacy checks.\n");
+ 	   }
+	   if (!strcmp(args[1], "recover")) {
+             printf("This command calls the `recover` program with the given disk image as the 2nd argument and recovers the files in the image.\n");
+           }
+	   if (!strcmp(args[1], "rank")) {
+             printf("This command calls the 'rank' program with the number if given as the 2nd argument and ranks the top quicksaves up to the given number.\n");  
+	   }
+	   if (!strcmp(args[1], "exit")) {
+	     printf("Exits the program.\n");
+           }
+
+	 }
 	 if (!strcmp(args[0], "info")) {
             printf("Current savefile: %s \n", pathname);
 	    printf("Score: %d \n", game.score);
 	    printf("Lines: %d \n", game.lines);	
+         }
+	 if (!strcmp(args[0], "switch")) {
+	    char* current;
+	    current = pathname;
+	    pathname = args[1];
+	    printf("Switch current quicksave from '%s' to '%s'.\n", current, pathname);
          }
 	 if (!strcmp(args[0], "check")) {
            args2 = parse_args_changes(arg, pathname);
@@ -80,16 +104,23 @@ int main() {
 	 if (!strcmp(args[0], "rank")) {
 	   int p[2];
 	   pipe(p); //error check this
-           printf("found check\n");
+           //printf("found check\n");
            pid = fork();
            if (pid == 0) {
 	    close(p[1]);
 	    dup2(p[0], STDIN_FILENO);
+	    /*
+	    for (char** c = args; c != NULL; c++) {
+	       printf("r= %s\n", *c);
+	    }
+	    */
+	   // args[0] = "/playpen/a5/rank"; 
+	    args[3] = "uplink";
             execve("/playpen/a5/rank", args, NULL);
 	    //read(
            }else{
 	          close(p[0]);
-  	          write(p[1], pathname, sizeof(pathname));		   
+  	          write(p[1], pathname, strlen(pathname));		   
                    int ret;
 		  close(p[1]);
                    wait(&ret);
