@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
+#include "tetris.h"
 #define STDLINESIZE 128
 
 char* read_line();
@@ -29,17 +29,21 @@ int main() {
 	char* arg_copy = strdup(arg);
    	args = parse_args(arg_copy);
         if (!strcmp(args[0], "recover")) {
+	 // p1[2];
+	 // if (pipe(p1) < 0} {
+ 	  //    return(EXIT_FAILURE);
+	  //}	   
            printf("found recover\n");
            pid = fork();
            if (pid == 0) {
+	    // fclose(p1[0]);	    
             execve("/playpen/a5/recover", args, NULL);
-           }else{
+	   }else{
                    int ret;
                    wait(&ret);
            }
         }
 	 if (!strcmp(args[0], "modify")) {
-           arg_copy = strdup(arg);
            args2 = parse_args_changes(arg, pathname);
 	   printf("found modify\n");
            pid = fork();
@@ -49,9 +53,20 @@ int main() {
                    int ret;
                    wait(&ret);
            }
+	   free(args2);
 	 }
+	 if (!strcmp(args[0], "info")) {
+            
+	    FILE *fp;
+	    fp = fopen(pathname, "rb");
+            TetrisGameState game;
+	    fread(&game, sizeof(TetrisGameState), 1, fp);	
+            printf("Current savefile: %s \n", pathname);
+	    printf("Score: %d \n", game.score);
+	    printf("Lines: %d \n", game.lines);	
+	    free(fp);    
+         }
 	 if (!strcmp(args[0], "check")) {
-           arg_copy = strdup(arg);
            args2 = parse_args_changes(arg, pathname);
            printf("found check\n");
            pid = fork();
@@ -61,9 +76,21 @@ int main() {
                    int ret;
                    wait(&ret);
            }
-	 }   
+	   free(args2);
+	 }  
+	/* if (!strcmp(args[0], "rank")) {
+	   int p[2];
+  	   write(p[1], pathname, sizeof(pathname));		   
+           printf("found check\n");
+           pid = fork();
+           if (pid == 0) {
+            execve("/playpen/a5/check", args2, NULL);
+           }else{
+                   int ret;
+                   wait(&ret);
+           }
+         }*/
             free(args);
-	    free(args2); 
     }
     free(pathname);
     free(arg);
