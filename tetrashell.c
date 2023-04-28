@@ -16,15 +16,18 @@ void check_buffer(void* buffer, char* output_text);
 
 int main() {
     char* arg;
-    char** args; 
+    char** args;
+    char** args2; 
     pid_t pid;
     /* FIND SAVE FILE */
     char* pathname = welcome();
 
+    pathname[strcspn(pathname, "\n")] = 0;
     /* MAIN LOOP */
     
     while(strcmp((arg = read_line()), "exit")) {
-   	args = parse_args(arg);
+	char* arg_copy = strdup(arg);
+   	args = parse_args(arg_copy);
         if (!strcmp(args[0], "recover")) {
            printf("found recover\n");
            pid = fork();
@@ -34,19 +37,33 @@ int main() {
                    int ret;
                    wait(&ret);
            }
-            free(args);
         }
-/*	 if (!strcmp(args[0], "modify")) {
-           printf("found modify\n");
+	 if (!strcmp(args[0], "modify")) {
+           arg_copy = strdup(arg);
+           args2 = parse_args_changes(arg, pathname);
+	   printf("found modify\n");
            pid = fork();
            if (pid == 0) {
-            execve("/playpen/a5/modify", args, NULL);
+            execve("/playpen/a5/modify", args2, NULL);
            }else{
                    int ret;
                    wait(&ret);
            }
+	 }
+	 if (!strcmp(args[0], "check")) {
+           arg_copy = strdup(arg);
+           args2 = parse_args_changes(arg, pathname);
+           printf("found check\n");
+           pid = fork();
+           if (pid == 0) {
+            execve("/playpen/a5/check", args2, NULL);
+           }else{
+                   int ret;
+                   wait(&ret);
+           }
+	 }   
             free(args);
-        } */
+	    free(args2); 
     }
     free(pathname);
     free(arg);
@@ -121,6 +138,7 @@ char** parse_args(char* args){
           check_buffer(buffed, "realloc failed in parse_args!");
 	    }
 	    buffed[i] = strdup(created);
+	    //buffed[i][strcspn(buffed[i], "\n")] = 0;
 	    created = strtok(NULL, " ");
 	    i++;
     }
@@ -132,13 +150,12 @@ char** parse_args(char* args){
     return buffed;
 }
 
-/*
 char** parse_args_changes(char* args, char* path_name){
     char** buffed = malloc(sizeof(char*));
     check_buffer(buffed, "malloc failed in parse_args!");
     int size = 1, i = 0;
     char* created;
-    created = strtok(args, " ");
+    created = strtok(args, " \n");
     while (created != NULL) {
             if (i >= size) {
               size *= 2;
@@ -146,7 +163,8 @@ char** parse_args_changes(char* args, char* path_name){
           check_buffer(buffed, "realloc failed in parse_args!");
             }
             buffed[i] = strdup(created);
-            created = strtok(NULL, " ");
+	    //buffed[i][strcspn(buffed[i], "\n")] = 0;
+            created = strtok(NULL, " \n");
             i++;
     }
     if (i >= size) {
@@ -154,7 +172,7 @@ char** parse_args_changes(char* args, char* path_name){
     buffed = realloc(buffed, (size)*sizeof(char*));
     check_buffer(buffed, "realloc failed in parse_args!");
     } 
-    buffed[i] = path_name;
+    buffed[i] = strdup(path_name);
     i++;
     if (i >= size) {
        buffed = realloc(buffed, (size + 1)*sizeof(char*));
@@ -163,7 +181,7 @@ char** parse_args_changes(char* args, char* path_name){
     buffed[i] = NULL;
     return buffed;
 }
-*/
+
 void check_buffer(void* buffer, char* output_text) {
     if (!buffer) {
         fprintf(stderr, "%s\n", output_text);
