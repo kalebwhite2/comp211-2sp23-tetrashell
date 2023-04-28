@@ -13,6 +13,7 @@ char** parse_args_changes(char* args, char* path_name);
 char* welcome();
 void print_image(FILE *fptr);
 void check_buffer(void* buffer, char* output_text); 
+void visualize(TetrisGameState state);
 
 int main() {
     char* arg;
@@ -95,6 +96,9 @@ int main() {
                    wait(&ret);
            }
          }
+      if (!strcmp(args[0], "visualize")) {
+        visualize(game); 
+      }
             free(args);
     }
     free(pathname);
@@ -221,6 +225,48 @@ char** parse_args_changes(char* args, char* path_name){
     }
     buffed[i] = NULL;
     return buffed;
+}
+
+#define TETRISPIECEARRAYSIZE 16
+#define BOARDW 20
+void visualize(TetrisGameState state) {
+    /* BOARD */
+    printf("\n\e[38;2;255;60;0mTHIS IS YOUR BOARD:\n\n");
+    printf("%s%s\n", "+---- Gameboard -----+", "\e[38;2;255;255;255m");
+    //board width + 1
+    char print_str[BOARDW + 1];
+    
+    //will need to translate i, j, to index in board field to TGS
+    int idx_in_board;
+    for (int i = 0; i < BLOCKS_TALL; i++) {
+      for (int j = 0; j < BLOCKS_WIDE; j++) {
+        idx_in_board = 10 * i + j;
+        print_str[2 * j] = state.board[idx_in_board];
+        print_str[2 * j + 1] = state.board[idx_in_board];
+      }
+
+      //print border & print_str, three calls for readability
+      printf("%s%s", "\e[38;2;255;60;0m|", "\e[38;2;255;255;255m");
+      printf("%s", print_str);
+      printf("%s%s\n", "\e[38;2;255;60;0m|", "\e[38;2;255;255;255m");
+    }
+
+    printf("%s%s\n\n", "\e[38;2;255;60;0m", "+--------------------+");
+
+    /* NEXT PIECE */
+    printf("THIS IS YOUR NEXT PIECE:\e[38;2;255;255;255m\n\n");
+    printf("%s", "+----+");
+    for (int i = 0; i < TETRISPIECEARRAYSIZE; i++) {
+       if (i % 4 == 3) {
+            printf("%c%s", tetris_pieces[state.current_piece][i], "|");
+       }
+       else if (i % 4 == 0) {
+            printf("%s%c", "\n|", tetris_pieces[state.current_piece][i]);
+       } else {
+            printf("%c", tetris_pieces[state.current_piece][i]);
+       }
+    }
+    printf("%s", "\n+----+\n\n");
 }
 
 void check_buffer(void* buffer, char* output_text) {
