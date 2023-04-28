@@ -33,6 +33,7 @@ int main() {
     free(arg);
 }
 
+#define MAXFILENAMESIZELINUX 255
 char* welcome() {
     //print out the intro text from intro_art.txt
     FILE * imgpath = fopen("intro_art.txt", "r");
@@ -46,10 +47,11 @@ char* welcome() {
     printf("WELCOME TO TETRASHELL\nTHE SHELL OF YOUR DREAMS\nENTER THE PATH TO YOUR QUICKSAVE: \n");
 
     //getline will automatically resize pathname if necessary
-    char* pathname = malloc(256); 
-    size_t pathsize = 256;
-    getline(&pathname, &pathsize, stdin);
-    
+    char* pathname = malloc(MAXFILENAMESIZELINUX);
+    check_buffer(pathname, "malloc for pathname in welcome failed!");
+    char* check_return = fgets(pathname, MAXFILENAMESIZELINUX, stdin);
+    check_buffer(check_return, "fgets failed in welcome!");
+
     return pathname;
 }
 
