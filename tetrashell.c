@@ -7,7 +7,7 @@
 #include "tetris.h"
 #define STDLINESIZE 128
 
-char* read_line();
+char* read_line(TetrisGameState game, char* pathname);
 char** parse_args(char* args);
 char** parse_args_changes(char* args, char* path_name);
 char* welcome();
@@ -24,8 +24,13 @@ int main() {
 
     pathname[strcspn(pathname, "\n")] = 0;
     /* MAIN LOOP */
+    FILE *fp;
+    fp = fopen(pathname, "rb");
+    TetrisGameState game;
+    fread(&game, sizeof(TetrisGameState), 1, fp);
+    free(fp);
     
-    while(strcmp((arg = read_line()), "exit")) {
+    while(strcmp((arg = read_line(game, pathname)), "exit")) {
 	char* arg_copy = strdup(arg);
    	args = parse_args(arg_copy);
         if (!strcmp(args[0], "recover")) {
@@ -56,15 +61,9 @@ int main() {
 	   free(args2);
 	 }
 	 if (!strcmp(args[0], "info")) {
-            
-	    FILE *fp;
-	    fp = fopen(pathname, "rb");
-            TetrisGameState game;
-	    fread(&game, sizeof(TetrisGameState), 1, fp);	
             printf("Current savefile: %s \n", pathname);
 	    printf("Score: %d \n", game.score);
 	    printf("Lines: %d \n", game.lines);	
-	    free(fp);    
          }
 	 if (!strcmp(args[0], "check")) {
            args2 = parse_args_changes(arg, pathname);
@@ -78,18 +77,24 @@ int main() {
            }
 	   free(args2);
 	 }  
-	/* if (!strcmp(args[0], "rank")) {
+	 if (!strcmp(args[0], "rank")) {
 	   int p[2];
-  	   write(p[1], pathname, sizeof(pathname));		   
+	   pipe(p); //error check this
            printf("found check\n");
            pid = fork();
            if (pid == 0) {
-            execve("/playpen/a5/check", args2, NULL);
+	    close(p[1]);
+	    dup2(p[0], STDIN_FILENO);
+            execve("/playpen/a5/rank", args, NULL);
+	    //read(
            }else{
+	          close(p[0]);
+  	          write(p[1], pathname, sizeof(pathname));		   
                    int ret;
+		  close(p[1]);
                    wait(&ret);
            }
-         }*/
+         }
             free(args);
     }
     free(pathname);
@@ -125,13 +130,22 @@ void print_image(FILE * imgpath) {
     }
 }
 
-char* read_line() {
+char* read_line(TetrisGameState game, char* pathname) {
     int line_size = STDLINESIZE, idx = 0, ch;
     char* buffer = malloc(sizeof(char) * line_size);
     check_buffer(buffer, "malloc failed in read_line!");
-
-    printf("tetrashell> ");
-    
+    char* username = getlogin();
+    char name[7];
+    int i = 0;
+    while (i < 4) {
+	name[i] = pathname[i];
+	i++;
+    }
+    while (i < 7) {
+	name[i] = '.';
+	i++;
+    }
+    printf("%s@TShell[%s][%d/%d] tetrashell>", username, name, game.score, game.lines);
     while (1) {
         ch = getchar();
 
