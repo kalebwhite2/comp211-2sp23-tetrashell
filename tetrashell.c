@@ -56,7 +56,10 @@ int main() {
 	     return(EXIT_FAILURE);
 	   }	   
            pid = fork();
-           if (pid == 0) {
+	   if (pid == -1) {
+	    perror("Error: ");
+            return 1;
+           }else if (pid == 0) {
 	    close(p1[0]);
             dup2(p1[1], fileno(stdout));
             dup2(open("/dev/null", O_WRONLY), fileno(stderr));	    
@@ -116,16 +119,21 @@ int main() {
 		     fgets(requested, sizeof(requested), stdin);
 		     requested[strcspn(requested,"\n")] = 0;
 		     num = atoi(requested) - 1;
-		     printf("Done! Current quicksave is now %s\n", child_names[num]);
-		     pathname = child_names[num];
-		     FILE *fp2;
-    		     fp2 = fopen(pathname, "rb");
+		     if (num > -1 && num < count - 1) {	
+		     	printf("Done! Current quicksave is now %s\n", child_names[num]);
+		     	pathname = child_names[num];
+		     	FILE *fp2;
+    		     	fp2 = fopen(pathname, "rb");
 		          if (fp2 == NULL) {
-                            printf("Invalid open path");
+                            printf("Invalid open path\n");
                             return EXIT_FAILURE;
-                         }
-    		     fread(&game, sizeof(TetrisGameState), 1, fp2);
-    		     fclose(fp2);
+                         } else {
+    		     	    fread(&game, sizeof(TetrisGameState), 1, fp2);
+    		     	    fclose(fp2);
+		         }
+		     }else {
+		         printf("invalid file number\n");
+	             }		 
        }
      }	   
     }
@@ -203,21 +211,20 @@ int main() {
 	      args[2] = "10";
            }		      
 	   int p[2];
-	   pipe(p); //error check this
-           //printf("found check\n");
+	   if (pipe(p) == -1) {
+	     perror("Error ");
+	     return 1;
+	   } 
            pid = fork();
-           if (pid == 0) {
+	   if (pid == -1) {
+	     perror("Error ");
+	     return 1;
+	   }
+	   else if (pid == 0) {
 	    close(p[1]);
 	    dup2(p[0], STDIN_FILENO);
-	    /*
-	    for (char** c = args; c != NULL; c++) {
-	       printf("r= %s\n", *c);
-	    }
-	    */
-	   // args[0] = "/playpen/a5/rank"; 
 	    args[3] = "uplink";
             execve("/playpen/a5/rank", args, NULL);
-	    //read(
            }else{
 	          close(p[0]);
   	          write(p[1], pathname, strlen(pathname));		   
