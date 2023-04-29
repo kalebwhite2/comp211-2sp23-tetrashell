@@ -119,11 +119,11 @@ int main() {
 		     printf("Done! Current quicksave is now %s\n", child_names[num]);
 		     pathname = child_names[num];
 		     FILE *fp2;
-		         if (fp2 == NULL) {
-      			    printf("Invalid open path");
-     			    return EXIT_FAILURE;
-		         }
     		     fp2 = fopen(pathname, "rb");
+		          if (fp2 == NULL) {
+                            printf("Invalid open path");
+                            return EXIT_FAILURE;
+                         }
     		     fread(&game, sizeof(TetrisGameState), 1, fp2);
     		     fclose(fp2);
        }
@@ -168,13 +168,13 @@ int main() {
 	    char* current;
 	    current = pathname;
 	    pathname = args[1];
-	    printf("Switch current quicksave from '%s' to '%s'.\n", current, pathname);
 	    FILE *fp2;
-	    if (fp2 == NULL) {
-                printf("Invalid open path");
-                return EXIT_FAILURE;
-            }
             fp2 = fopen(pathname, "rb");
+	    if (fp2 == NULL) {
+            	printf("Invalid open path\n");
+            	return EXIT_FAILURE;
+            }
+	    printf("Switch current quicksave from '%s' to '%s'.\n", current, pathname);
             fread(&game, sizeof(TetrisGameState), 1, fp2);
             fclose(fp2);
 	 }
@@ -250,14 +250,16 @@ char* welcome() {
     //getline will automatically resize pathname if necessary
     char* pathname = malloc(256); 
     size_t pathsize = 256;
-    getline(&pathname, &pathsize, stdin);
-    FILE *fp3;
-    fp3 = fopen(pathname, "rb");
-    if (fp3 == NULL) {
-      printf("invalid file given");
-      return "EXIT_FAILURE";
-     }    
-    fclose(fp3);
+    int c;
+    c = getline(&pathname, &pathsize, stdin);
+    FILE *fp2;
+    pathname[c - 1] = 0;
+    fp2 = fopen(pathname, "rb");
+    if (fp2 == NULL) {
+      perror("Error: ");
+      exit(1);
+     }
+    fclose(fp2);
     return pathname;
 }
 
