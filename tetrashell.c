@@ -61,7 +61,7 @@ int main() {
         return EXIT_FAILURE;
     }
     
-    pathname[c - 1] = 0;
+    *(pathname)[c - 1] = 0;
     if (!strcmp(pathname, "exit") || !strcmp(pathname, "exit")) {
         return EXIT_SUCCESS;
     }
@@ -78,7 +78,8 @@ int main() {
   
 
   /* MAIN LOOP */
-  while (strcmp((arg = read_line(game, pathname)), "exit")) {
+  while (strcmp((arg = read_line(game, pathname)), "exit") && strcmp(arg, "e")
+         && strcmp(arg, "ex") && strcmp(arg, "exi")) {
     // dup args because strtok will change them otherwise
     char* arg_copy = strdup(arg);
     args = parse_args(arg_copy);
@@ -310,19 +311,19 @@ void print_image(FILE* imgpath) {
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
   *fp = fopen(*pathname, "rb");
   if (*fp == NULL) {
-    perror("Error: ");
+    perror("Error");
     return 0;
   }
   int read_check;
   read_check = fread(game, sizeof(TetrisGameState), 1, *fp);
   if (read_check < 1) {
-    perror("Error: ");
+    perror("Error");
     return 0;
   }
   int close_check;
   close_check = fclose(*fp);
   if (close_check != 0) {
-    perror("Error: ");
+    perror("Error");
     return 0;
   }
   return 1;
@@ -857,12 +858,26 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
   current = *pathname;
   *pathname = args[1];
   FILE* fp2;
-  fp2 = fopen(*pathname, "rb");
-  if (fp2 == NULL) {
-    printf("Invalid open path\n");
-    exit(EXIT_FAILURE);
+  size_t pathsize = 256;
+  int c;
+
+  while (!verify_save(game, pathname, &fp2)) {
+    printf("\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
+           "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
+
+    c = getline(pathname, &pathsize, stdin);
+    if (c < 0) { //getline returns < 0 on failure
+        printf("getline failure while getting a valid save");
+        return EXIT_FAILURE;
+    }
+    
+    (*pathname)[c - 1] = 0;
+    if (!strcmp(*pathname, "exit") || !strcmp(*pathname, "exit")) {
+        return EXIT_FAILURE;
+    }
   }
-  printf("Switch current quicksave from '%s' to '%s'.\n", current, *pathname);
+
+  printf("Switched current quicksave from '%s' to '%s'.\n", current, *pathname);
   fread(game, sizeof(TetrisGameState), 1, fp2);
   fclose(fp2);
   return 1;
