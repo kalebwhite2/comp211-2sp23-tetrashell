@@ -11,9 +11,7 @@
 #include "tetris.h"
 #include "train.h"
 
-#define STDLINESIZE 128
-
-/* FUNCTIONS AND STRUCTS */
+/* HELPER FUNCTIONS */
 char* read_line(TetrisGameState game, char* pathname);
 char** parse_args(char* args);
 char** parse_args_changes(char* args, char* path_name);
@@ -21,7 +19,21 @@ char** parse_args_ranked(char* args, char* path_name);
 char* welcome();
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp);
 void print_image(FILE* fptr);
+
+/* HELPER STRUCTS */
+typedef struct State {
+  int i;
+  TetrisGameState g;
+} State;
+
+
+/* ERROR CHECKERS */
 void check_buffer(void* buffer, char* output_text);
+void check_0(int to_check, char* output_text);
+void check_EOF(int to_check, char* output_text); 
+#define check_neg(to_check, output_text) check_EOF(to_check, output_text)
+
+/* COMMANDS */
 void visualize(TetrisGameState state);
 void play(char* pathname);
 int recover(char** args, TetrisGameState* game, char** pathname);
@@ -29,10 +41,6 @@ void modify(char** args, TetrisGameState* game, char** pathname);
 int switch_func(char** args, TetrisGameState* game, char** pathname);
 void help(char** args);
 void rank(char* arg, char** args, char** pathname);
-typedef struct State {
-  int i;
-  TetrisGameState g;
-} State;
 
 /* MAIN */
 int main() {
@@ -56,12 +64,10 @@ int main() {
            "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
 
     c = getline(&pathname, &pathsize, stdin);
-    if (c < 0) { //getline returns < 0 on failure
-        printf("getline failure while getting a valid save");
-        return EXIT_FAILURE;
-    }
+    //getline returns < 0 on failure
+    check_neg(c, "getline failed in verify_save!");
     
-    *(pathname)[c - 1] = 0;
+    pathname[c - 1] = 0;
     if (!strcmp(pathname, "exit") || !strcmp(pathname, "exit")) {
         return EXIT_SUCCESS;
     }
@@ -180,8 +186,8 @@ int main() {
         !strcmp(args[0], "ch") || !strcmp(args[0], "che") ||
         !strcmp(args[0], "chec")) {
       args2 = parse_args_changes(arg, pathname);
-      printf("found check\n");
       pid_t pid = fork();
+      check_neg((int) pid, "fork failed at check!");
       if (pid == 0) {
         execve("/playpen/a5/check", args2, NULL);
       } else {
@@ -240,13 +246,9 @@ int main() {
       play(pathname);
       // reopen file to read back in the game stats
       FILE* fp;
-      if ((fp = fopen(pathname, "r")) == NULL) {
-        printf("open failed on modify file reopen!\n");
-        perror("Error: ");
-        exit(EXIT_FAILURE);
-      }
-      fread(&game, sizeof(TetrisGameState), 1, fp);
-      fclose(fp);
+      check_buffer(fp = fopen(pathname, "r"), "fopen failed in play!");
+      check_0((fread(&game, sizeof(TetrisGameState), 1, fp)), "fread failed in play!");
+      check_EOF((fclose(fp)), "fclose failed in play");
       printf(
           "\e[38;2;255;60;0mYOUR RESULTS HAVE BEEN WRITTEN TO YOUR "
           "SAVE.\e[38;2;255;255;255m\n");
@@ -255,7 +257,7 @@ int main() {
     //USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH THE SHELL
     //(readline returned bad_command
     else if (!strcmp(args[0], "bad_command")) {
-     printf("\e[38;2;255;60;0mPLEASE ENTER A COMMAND.DO NOT MESS WITH THE SHELL.\e[38;2;255;255;255m\n");
+     printf("\e[38;2;255;60;0mPLEASE ENTER A COMMAND. DO NOT MESS WITH THE SHELL.\e[38;2;255;255;255m\n");
     }
 
 
@@ -273,12 +275,9 @@ int main() {
 char* welcome() {
   // print out the intro text from intro_art.txt
   FILE* imgpath = fopen("intro_art.txt", "r");
-  if (imgpath == NULL) {
-    fprintf(stderr, "unable to open image \n");
-    exit(EXIT_FAILURE);
-  }
+  check_buffer(imgpath, "unable to open image");
   print_image(imgpath);
-  fclose(imgpath);
+  check_EOF(fclose(imgpath), "fclose failed in welcome");
 
   printf(
       "WELCOME TO TETRASHELL\nTHE SHELL OF YOUR DREAMS\nENTER THE PATH TO YOUR "
@@ -286,14 +285,12 @@ char* welcome() {
 
   // getline will automatically resize pathname if necessary
   char* pathname = malloc(256);
+  check_buffer(pathname, "allocation to pathname failed!");
   size_t pathsize = 256;
 
   int c;
   c = getline(&pathname, &pathsize, stdin);
-  if (c < 0) { //getline returns < 0 on failure
-     printf("getline failure in welcome");
-     exit(EXIT_FAILURE);
-  }
+  check_neg(c, "getline failure in welcome"); //getline returns -1 on failure
 
   pathname[strcspn(pathname, "\n")] = 0;
   return pathname;
@@ -309,7 +306,7 @@ void print_image(FILE* imgpath) {
 }
 
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
-  *fp = fopen(*pathname, "rb");
+  *fp = fopen(*pathname, "r");
   if (*fp == NULL) {
     perror("Error");
     return 0;
@@ -332,7 +329,7 @@ int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
 #define RED "\e[38;2;255;60;0m"
 #define WHITE "\e[38;2;255;255;255m"
 char* read_line(TetrisGameState game, char* pathname) {
-  int line_size = STDLINESIZE, ch, idx = 0, format_idx = 0;
+  int line_size = 256, ch, idx = 0, format_idx = 0;
   char* buffer = malloc(sizeof(char) * line_size);
   check_buffer(buffer, "malloc failed in read_line!");
   char* username = getlogin();
@@ -414,7 +411,7 @@ char** parse_args_changes(char* args, char* path_name) {
     if (i >= size) {
       size *= 2;
       buffed = realloc(buffed, size * sizeof(char*));
-      check_buffer(buffed, "realloc failed in parse_args!");
+      check_buffer(buffed, "realloc failed in parse_args_changes!");
     }
     buffed[i] = strdup(created);
     created = strtok(NULL, " \n");
@@ -423,13 +420,13 @@ char** parse_args_changes(char* args, char* path_name) {
   if (i >= size) {
     size *= 2;
     buffed = realloc(buffed, (size) * sizeof(char*));
-    check_buffer(buffed, "realloc failed in parse_args!");
+    check_buffer(buffed, "realloc failed in parse_args_changes!");
   }
   buffed[i] = strdup(path_name);
   i++;
   if (i >= size) {
     buffed = realloc(buffed, (size + 1) * sizeof(char*));
-    check_buffer(buffed, "realloc failed in parse_args!");
+    check_buffer(buffed, "realloc failed in parse_args_changes!");
   }
   buffed[i] = NULL;
   return buffed;
@@ -437,7 +434,7 @@ char** parse_args_changes(char* args, char* path_name) {
 
 char** parse_args_ranked(char* args, char* path_name) {
   char** buffed = malloc(sizeof(char*));
-  check_buffer(buffed, "malloc failed in parse_args!");
+  check_buffer(buffed, "malloc failed in parse_args_ranked!");
   int size = 1, i = 0;
   char* created;
   created = strtok(args, " \n");
@@ -445,30 +442,29 @@ char** parse_args_ranked(char* args, char* path_name) {
     if (i >= size) {
       size *= 2;
       buffed = realloc(buffed, size * sizeof(char*));
-      check_buffer(buffed, "realloc failed in parse_args!");
+      check_buffer(buffed, "realloc failed in parse_args_ranked!");
     }
     buffed[i] = strdup(created);
-    // buffed[i][strcspn(buffed[i], "\n")] = 0;
     created = strtok(NULL, " \n");
     i++;
   }
   if (i >= size) {
     size *= 2;
     buffed = realloc(buffed, (size) * sizeof(char*));
-    check_buffer(buffed, "realloc failed in parse_args!");
+    check_buffer(buffed, "realloc failed in parse_args_ranked!");
   }
   buffed[i] = strdup(path_name);
   i++;
   if (i >= size) {
     size *= 2;
     buffed = realloc(buffed, (size) * sizeof(char*));
-    check_buffer(buffed, "realloc failed in parse_args!");
+    check_buffer(buffed, "realloc failed in parse_args_ranked!");
   }
   buffed[i] = "ok";
   i++;
   if (i >= size) {
     buffed = realloc(buffed, (size + 1) * sizeof(char*));
-    check_buffer(buffed, "realloc failed in parse_args!");
+    check_buffer(buffed, "realloc failed in parse_args_ranked!");
   }
   buffed[i] = NULL;
   return buffed;
@@ -527,21 +523,13 @@ void play(char* pathname) {
 
   // make pipes: p1 for stdout from child, p2 for stdin from parent
   int w_stdout[2];
-  if (pipe(w_stdout) == -1) {
-    perror("pipe failed in play: ");
-    exit(EXIT_FAILURE);
-  }
+  check_neg((pipe(w_stdout)), "pipe failed in play");
   int w_stdin[2];
-  if (pipe(w_stdin) == -1) {
-    perror("pipe failed in play: ");
-    exit(EXIT_FAILURE);
-  }
+  check_neg((pipe(w_stdin)), "pipe failed in play");
 
   pid_t pid = fork();
-  if (pid == -1) {
-    perror("fork failed in play: ");
-    exit(EXIT_FAILURE);
-  } else if (pid == 0) {
+  check_neg(pid, "fork failed in play");
+  if (pid == 0) {
     // close read end of stdout, write end of stdin
     close(w_stdout[READ]);
     close(w_stdin[WRITE]);
@@ -574,10 +562,8 @@ void play(char* pathname) {
     while (1) {
       // read
       ssize_t count = read(w_stdout[READ], buffer, sizeof(buffer));
-      if (count == -1) {
-        perror("failed to read from tetris' stdout in play: ");
-        exit(EXIT_FAILURE);
-      } else if (count == 0) {
+      check_neg((int)count, "failed to read from tetris' stdout in play");
+      if (count == 0) {
         break;
       } else {
         printf("%s", buffer);
@@ -587,10 +573,7 @@ void play(char* pathname) {
       int inp;
       inp = getch();
       count = write(w_stdin[WRITE], &inp, sizeof(int));
-      if (count == -1) {
-        perror("failed to write to tetris' stdout in play: ");
-        exit(EXIT_FAILURE);
-      }
+      check_neg((int)count, "failed to write to tetris' stdin in play");
     }
     endwin();
 
@@ -601,24 +584,13 @@ void play(char* pathname) {
   }
 }
 
-void check_buffer(void* buffer, char* output_text) {
-  if (!buffer) {
-    fprintf(stderr, "%s\n", output_text);
-    exit(EXIT_FAILURE);
-  }
-}
 
 int recover(char** args, TetrisGameState* game, char** pathname) {
   int p1[2] = {0};
-  if (pipe(p1) < 0) {
-    perror("Error with pipe");
-    return (EXIT_FAILURE);
-  }
+  check_neg((pipe(p1)), "error with pipe in recover");
   pid_t pid = fork();
-  if (pid == -1) {
-    perror("Error: ");
-    return 1;
-  } else if (pid == 0) {
+  check_neg(pid, "fork failed in recover");
+  if (pid == 0) {
     close(p1[0]);
     dup2(p1[1], fileno(stdout));
     dup2(open("/dev/null", O_WRONLY), fileno(stderr));
@@ -670,12 +642,9 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
     for (int i = 0; i < count - 1; i++) {
       FILE* child_file;
       child_file = fopen(child_names[i], "rb");
-      if (child_file == NULL) {
-        printf("Invalid open path");
-        return EXIT_FAILURE;
-      }
+      check_buffer(child_file, "open failed in recover");
       TetrisGameState game2;
-      fread(&game2, sizeof(TetrisGameState), 1, child_file);
+      check_0((fread(&game2, sizeof(TetrisGameState), 1, child_file)), "read failed in recover");
       fclose(child_file);
       printf("%-4d %-21s %-7d %-7d \n", i + 1, child_names[i], game2.score,
              game2.lines);
@@ -695,11 +664,7 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
         *pathname = child_names[num];
         FILE* fp2;
         fp2 = fopen(*pathname, "rb");
-        if (fp2 == NULL) {
-          printf("Invalid open path\n");
-          exit(EXIT_FAILURE);
-        }
-
+        check_buffer(fp2, "tried to open invalid quicksave when switching in recover");
         fread(game, sizeof(TetrisGameState), 1, fp2);
         fclose(fp2);
         return 1;
@@ -727,12 +692,9 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
 
       // reopen file to read back in the game stats
       FILE* fp;
-      if ((fp = fopen(*pathname, "r")) == NULL) {
-        printf("open failed on modify file reopen!\n");
-        perror("Error: ");
-        exit(EXIT_FAILURE);
-      }
-      fread(game, sizeof(TetrisGameState), 1, fp);
+      fp = fopen(*pathname, "r");
+      check_buffer(fp, "open failed in modify");
+      check_0((fread(game, sizeof(TetrisGameState), 1, fp)), "couldn't read back from modify");
       fclose(fp);
       return;
   }
@@ -797,6 +759,13 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
 
   }
 
+  else if (!strcmp(args[1], "current_piece")) {
+     char* str_part_one, * str_part_two;
+     long int x = strtol(args[2], &str_part_one, 10);
+     long int y = strtol(args[3], &str_part_two, 10);
+
+  }
+
   else {
       printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
               "TO MODIFY. \e[38;2;255;255;255m\n");
@@ -807,10 +776,7 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
   if (!strcmp(args[1], "board") || !strcmp(args[1], "next_piece")) {
       FILE * fp; 
       check_buffer((fp = fopen(*pathname, "wb")), "file open to write failed in modify!");
-      if ((fwrite(game, sizeof(TetrisGameState), 1, fp)) == 0) {
-          printf("write failed in modify!\n");
-          exit(EXIT_FAILURE);
-      }
+      check_0((fwrite(game, sizeof(TetrisGameState), 1, fp)), "write failed in modify");
       fclose(fp);
   }
 }
@@ -831,7 +797,8 @@ void help(char** args) {
   if (!strcmp(args[1], "recover")) {
     printf(
         "This command calls the `recover` program with the given disk "
-        "image as the 2nd argument and recovers the files in the image.\n");
+        "image as the 2nd argument and recovers the files in the image."
+        " The user can switch to one of the recovered game states.\n");
   }
   if (!strcmp(args[1], "rank")) {
     printf(
@@ -850,6 +817,13 @@ void help(char** args) {
   if (!strcmp(args[1], "exit")) {
     printf("Exits the program.\n");
   }
+  if (!strcmp(args[1], "info")) {
+    printf("Prints the current score and lines.\n");
+  }
+  if (!strcmp(args[1], "switch")) {
+    printf("Changes the current file to the second argument called with "
+           "switch. This will reset the undo buffer.\n");
+  }
 }
 
 int switch_func(char** args, TetrisGameState* game, char** pathname) {
@@ -866,10 +840,7 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
            "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
 
     c = getline(pathname, &pathsize, stdin);
-    if (c < 0) { //getline returns < 0 on failure
-        printf("getline failure while getting a valid save");
-        return EXIT_FAILURE;
-    }
+    check_neg(c, "getline failure while getting a valid save"); //getline returns < 0 on failure
     
     (*pathname)[c - 1] = 0;
     if (!strcmp(*pathname, "exit") || !strcmp(*pathname, "exit")) {
@@ -878,10 +849,9 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
   }
 
   printf("Switched current quicksave from '%s' to '%s'.\n", current, *pathname);
-  fread(game, sizeof(TetrisGameState), 1, fp2);
-  fclose(fp2);
   return 1;
 }
+
 
 void rank(char* arg, char** args, char** pathname) {
   if (!args[1]) {
@@ -896,15 +866,10 @@ void rank(char* arg, char** args, char** pathname) {
     args[2] = "10";
   }
   int p[2];
-  if (pipe(p) == -1) {
-    perror("Error ");
-    exit(EXIT_FAILURE);
-  }
+  check_neg((pipe(p)), "pipe failed in rank");
   pid_t pid = fork();
-  if (pid == -1) {
-    perror("Error ");
-    exit(EXIT_FAILURE);
-  } else if (pid == 0) {
+  check_neg(pid, "fork failed in rank");
+  if (pid == 0) {
     close(p[1]);
     dup2(p[0], STDIN_FILENO);
     args[0] = "/playpen/a5/rank";
@@ -912,9 +877,32 @@ void rank(char* arg, char** args, char** pathname) {
     execve("/playpen/a5/rank", args, NULL);
   } else {
     close(p[0]);
-    write(p[1], *pathname, strlen(*pathname));
+    check_0((write(p[1], *pathname, strlen(*pathname))), "write from shell to rank failed");
     int ret;
     close(p[1]);
     wait(&ret);
   }
 }
+
+void check_buffer(void* buffer, char* output_text) {
+  if (!buffer) {
+    perror("Error ");
+    fprintf(stderr, "%s\n", output_text);
+    exit(EXIT_FAILURE);
+  }
+}
+
+void check_0(int to_check, char* output_text) {
+  if (to_check == 0) {
+    fprintf(stderr, "%s\n", output_text);
+    exit(EXIT_FAILURE);
+  }
+}
+
+void check_EOF(int to_check, char* output_text) {
+  if (to_check <= EOF) {
+    fprintf(stderr, "%s\n", output_text);
+    exit(EXIT_FAILURE);
+  }
+}
+
