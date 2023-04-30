@@ -484,8 +484,13 @@ void visualize(TetrisGameState state) {
   for (int i = 0; i < BLOCKS_TALL; i++) {
     for (int j = 0; j < BLOCKS_WIDE; j++) {
       idx_in_board = 10 * i + j;
-      print_str[2 * j] = state.board[idx_in_board];
-      print_str[2 * j + 1] = state.board[idx_in_board];
+      if (!state.board[idx_in_board]) {
+          print_str[2 * j] = ' ';
+          print_str[2 * j + 1] = ' ';
+      } else {
+          print_str[2 * j] = state.board[idx_in_board];
+          print_str[2 * j + 1] = state.board[idx_in_board];
+      }
     }
 
     // print border & print_str, three calls for readability
@@ -763,6 +768,26 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
      char* str_part_one, * str_part_two;
      long int x = strtol(args[2], &str_part_one, 10);
      long int y = strtol(args[3], &str_part_two, 10);
+
+     if (strcmp(str_part_one, "") || strcmp(str_part_two, "")) {
+        printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN TO MODIFY CURRENT_PIECE. "
+               " PLEASE ENTER COMMAND IN FORMAT \e[38;2;255;255;255m\n"
+               " modify current_piece int int\n"); 
+        return;
+     }
+     // x and y must be acceptable values for computation to be correct
+     if (x < 0 || x > 9) {
+        printf("\e[38;2;255;60;0mX VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE OR SMALL. "
+              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 9. \e[38;2;255;255;255m\n");
+        return;
+     }
+     if (y < 0 || y > 19) {
+        printf("\e[38;2;255;60;0mY VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE OR SMALL. "
+              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 19. \e[38;2;255;255;255m\n");
+        return;
+     }
+     int start_idx = 10 * y + x;
+     game->current_piece = start_idx;
 
   }
 
