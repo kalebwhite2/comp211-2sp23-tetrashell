@@ -11,20 +11,25 @@
 #include "tetris.h"
 #include "train.h"
 
+/* HELPER STRUCTS */
+typedef struct State {
+  int i;
+  TetrisGameState g;
+} State;
+typedef struct Commands {
+  int i;
+  char cmd[256];
+} Command;
+
+
 /* HELPER FUNCTIONS */
-char* read_line(TetrisGameState game, char* pathname);
+char* read_line(TetrisGameState game, char* pathname, Command** prev_commands, int* from_previous);
 char** parse_args(char* args);
 char** parse_args_changes(char* args, char* path_name);
 char** parse_args_ranked(char* args, char* path_name);
 char* welcome();
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp);
 void print_image(FILE* fptr);
-
-/* HELPER STRUCTS */
-typedef struct State {
-  int i;
-  TetrisGameState g;
-} State;
 
 
 /* ERROR CHECKERS */
@@ -83,15 +88,47 @@ int main() {
   state2.i = 0;
   State prev_game_states[3] = {state0, state1, state2};
   int modify_called = 0;
-  
+
+  /* INIT COMMAND BUFFER */
+  Command c1, c2, c3;
+  c1.i = 0;
+  c2.i = 0;
+  c3.i = 0;
+  Command* prev_commands = malloc(3 * sizeof(Command)); 
+  prev_commands[0] = c1; prev_commands[1] = c2; prev_commands[2] = c3; 
+  int from_previous = 0;
 
   /* MAIN LOOP */
-  while (strcmp((arg = read_line(game, pathname)), "exit") && strcmp(arg, "e")
+  while (strcmp((arg = read_line(game, pathname, &prev_commands, &from_previous)), "exit") && strcmp(arg, "e")
          && strcmp(arg, "ex") && strcmp(arg, "exi")) {
     // dup args because strtok will change them otherwise
     char* arg_copy = strdup(arg);
     args = parse_args(arg_copy);
     free(arg_copy);
+
+    //for buffering NOTE: not messing with malloc here. Max cmd size 256.
+    //there's a better way to do this which is both very obvious and beyond me
+    if (!from_previous) {
+        if (prev_commands[2].i) {
+           strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
+           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+           strcpy(prev_commands[0].cmd, arg);
+        } else if (prev_commands[1].i) {
+           strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
+           prev_commands[2].i = 1;
+           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+           strcpy(prev_commands[0].cmd, arg);
+        } else if (prev_commands[0].i) {
+           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+           prev_commands[1].i = 1;
+           strcpy(prev_commands[0].cmd, arg);
+        } else {
+           prev_commands[0].i = 1;
+           strcpy(prev_commands[0].cmd, arg);
+        }
+    }
+
+
     if (!strcmp(args[0], "recover") || !strcmp(args[0], "re") ||
         !strcmp(args[0], "rec") || !strcmp(args[0], "reco") ||
         !strcmp(args[0], "recov") || !strcmp(args[0], "recove")) {
@@ -277,7 +314,11 @@ int main() {
     else {
       printf("\e[38;2;255;60;0mCOMMAND NOT RECOGNIZED.\e[38;2;255;255;255m\n");
     }
-    free(arg);
+
+    //suspect this is necessary because strcpy does something with permissions?
+    if (!from_previous) {
+        free(arg);
+    }
   }
   for (int i = 0; i < sizeof(args) / sizeof(char*); i++) {
       free(args[i]);
@@ -285,6 +326,7 @@ int main() {
   free(args);
   free(arg);
   free(pathname);
+  free(prev_commands);
   return EXIT_SUCCESS;
 }
 
@@ -316,13 +358,16 @@ char* welcome() {
   return tmp;
 }
 
+
 #define MAXIMGLINESIZE 128
 void print_image(FILE* imgpath) {
   char str[MAXIMGLINESIZE];
 
+  printf("%s", "\e[38;2;255;60;0m");
   while (fgets(str, sizeof(str), imgpath) != NULL) {
     printf("%s", str);
   }
+  printf("%s", "\e[38;2;255;255;255m");
 }
 
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
@@ -348,11 +393,12 @@ int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
 
 #define RED "\e[38;2;255;60;0m"
 #define WHITE "\e[38;2;255;255;255m"
-char* read_line(TetrisGameState game, char* pathname) {
+char* read_line(TetrisGameState game, char* pathname, Command** prev_commands, int* from_previous) {
   int line_size = 256, ch, idx = 0, format_idx = 0;
   char* buffer = malloc(sizeof(char) * line_size);
   check_buffer(buffer, "malloc failed in read_line!");
   char* username = getlogin();
+  *from_previous = 0;
 
   //shell command line
   char name[7];
@@ -381,6 +427,37 @@ char* read_line(TetrisGameState game, char* pathname) {
       }
       buffer[idx] = '\0';
       return buffer;
+    } else if (ch == '\033' && (ch = getchar()) == '[' && (ch = getchar()) == 'A') { //redo functionality - up arrow ansi escape code is \033[A
+        *from_previous = 1;
+        //move out of prev_commands - move in every time we read a line 
+        if ((*prev_commands)[2].i) {
+           strcpy(buffer, (*prev_commands)[0].cmd);
+           strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
+           strcpy((*prev_commands)[1].cmd, (*prev_commands)[2].cmd);
+           (*prev_commands)[2].i = 0;
+        } else if ((*prev_commands)[1].i) {
+           strcpy(buffer, (*prev_commands)[0].cmd);
+           strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
+           (*prev_commands)[1].i = 0;
+        } else if ((*prev_commands)[0].i) {
+           strcpy(buffer, (*prev_commands)[0].cmd);
+           (*prev_commands)[0].i = 0;
+        } else {
+           printf("%s%s%s\n", RED, "UP ARROW PRESSED WITH NO COMMANDS BUFFERED.", WHITE);
+           //clear stdin
+           while (getchar() != '\n') {} 
+           char* r = "bad_command";
+           return r;
+        }
+
+        printf("%s%s%s%s%s\n", RED, "Run previous command: ", buffer, "? (y/n)", WHITE);
+        char yn;
+        scanf(" %c", &yn);
+        if (yn == 'y') {
+            //clear stdin
+            while (getchar() != '\n') {} 
+            return buffer;
+        }
     } else {
       buffer[idx] = ch;
       idx++;

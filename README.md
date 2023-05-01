@@ -73,6 +73,10 @@ The help command, if called using, `help recover`, would return information on t
 The undo function allows the user to undo a modify command. It allows up to three undos of modify commands.
 If the save file is switched by `switch` or some instances of `recover`, all buffered saves will no longer be accesible.
 
+###Redo / ^[[A / \033[A
+The shell buffers previous commands in the same way it buffers previous modifies, also up to 3 commands.
+Press up and enter (on most machines & terminals - i.e. iff pressing up sends \033[A to std in) to rerun the previous command.
+
 ###Info, Visualize, Train
 The info, visualize and train functions are all implemented as suggested. To call them:
 *`info`
