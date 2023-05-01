@@ -950,32 +950,32 @@ void rank(char* arg, char** args, char** pathname) {
       if (current < 5) {
          for (int b = 0; b < count2 + 6; b++){
            if (b == current) {
-             printf("\033[1m%3d\033[0m %s\n",b+1, child_names2[b]);
+             printf("\033[1m%-3d\033[0m %s\n",b+1, child_names2[b]);
            }else {
-             printf("%3d %s\n", RED, b+1, child_names2[b], WHITE);
+             printf("%s%-3d %s%s\n", RED, b+1, child_names2[b], WHITE);
            }
          }
       }
       else if (current > count2 - 5) {	
 	 for (int b = current - 5; b < count2 - 1; b++){   
            if (b == current) {
-             printf("\033[1m%3d\033[0m %s\n",b+1, child_names2[b]);
+             printf("\033[1m%-3d\033[0m %s\n",b+1, child_names2[b]);
            }else {
-             printf("%s%3d %s%s\n",RED, b+1, child_names2[b], WHITE);
+             printf("%s%-3d %s%s\n",RED, b+1, child_names2[b], WHITE);
 	   }  
 	 }
       } else {
 	 for (int b = current - 5; b < current + 6; b++){
          if (b == current) {    
-           printf("\033[1m%3d\033[0m %s\n",b+1, child_names2[b]);
+           printf("\033[1m%-3d\033[0m %s\n",b+1, child_names2[b]);
          }else {
-           printf("%s%3d %s%s\n",RED, b+1, child_names2[b], WHITE);
+           printf("%s%-3d %s%s\n",RED, b+1, child_names2[b], WHITE);
          }      
         }      
       }	    
     }else {
       for (int i = 0; i < count2 - 1; i++) {
-      printf("%3d %s\n",i+1, child_names2[i]);
+      printf("%-3d %s\n",i+1, child_names2[i]);
      } 
     }	      
   }
