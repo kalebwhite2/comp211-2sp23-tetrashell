@@ -35,7 +35,7 @@ void check_EOF(int to_check, char* output_text);
 
 /* COMMANDS */
 void visualize(TetrisGameState state);
-void play(char* pathname);
+/*void play(char* pathname);*/
 int recover(char** args, TetrisGameState* game, char** pathname);
 void modify(char** args, TetrisGameState* game, char** pathname);
 int switch_func(char** args, TetrisGameState* game, char** pathname);
@@ -251,6 +251,7 @@ int main() {
       train();
     }
 
+    /*
     //PLAY
     else if (!strcmp(args[0], "play")) {
       play(pathname);
@@ -263,6 +264,7 @@ int main() {
           "\e[38;2;255;60;0mYOUR RESULTS HAVE BEEN WRITTEN TO YOUR "
           "SAVE.\e[38;2;255;255;255m\n");
     }
+    */
 
     //USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH THE SHELL
     //(readline returned bad_command)
@@ -536,14 +538,12 @@ void visualize(TetrisGameState state) {
   printf("%s", "\n\e[38;2;255;60;0m+----+\e[38;2;255;255;255m\n\n");
 }
 
+/* We tried. You can uncomment and recompile if you're curious.
 #define READ 0
 #define WRITE 1
 #define STDIN 0
 #define STDOUT 1
 void play(char* pathname) {
-  printf("\e[38;2;255;60;0mPRESS ENTER TO PLAY\e[38;2;255;255;255m\n");
-  getchar();
-
   // make pipes: p1 for stdout from child, p2 for stdin from parent
   int w_stdout[2];
   check_neg((pipe(w_stdout)), "pipe failed in play");
@@ -573,6 +573,8 @@ void play(char* pathname) {
     initscr();
     noecho();
     cbreak();
+    printw("PRESS ANY CHARACTER TO PLAY.");
+    getch();
 
     // set up piping: close write end of stdout, read end of stdin
     close(w_stdout[WRITE]);
@@ -606,6 +608,7 @@ void play(char* pathname) {
     wait(0);
   }
 }
+*/
 
 int recover(char** args, TetrisGameState* game, char** pathname) {
   int p1[2] = {0};
