@@ -58,6 +58,7 @@ int main() {
   int c;
   size_t pathsize = 256;
   TetrisGameState game;
+  
   FILE* fp;
   while (!verify_save(&game, &pathname, &fp)) {
     printf("\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
@@ -69,6 +70,7 @@ int main() {
     
     pathname[c - 1] = 0;
     if (!strcmp(pathname, "exit") || !strcmp(pathname, "exit")) {
+        free(pathname);
         return EXIT_SUCCESS;
     }
   }
@@ -89,6 +91,7 @@ int main() {
     // dup args because strtok will change them otherwise
     char* arg_copy = strdup(arg);
     args = parse_args(arg_copy);
+    free(arg_copy);
     if (!strcmp(args[0], "recover") || !strcmp(args[0], "re") ||
         !strcmp(args[0], "rec") || !strcmp(args[0], "reco") ||
         !strcmp(args[0], "recov") || !strcmp(args[0], "recove")) {
@@ -144,6 +147,9 @@ int main() {
       // call to modify
       args2 = parse_args_changes(arg, pathname);
       modify(args2, &game, &pathname);
+      for (int i = 0; i < sizeof(args2) / sizeof(char*); i++) {
+          free(args2[i]);
+      }
       free(args2);
     }
 
@@ -193,6 +199,10 @@ int main() {
       } else {
         int ret;
         wait(&ret);
+      }
+
+      for (int i = 0; i < sizeof(args2) / sizeof(char*); i++) {
+          free(args2[i]);
       }
       free(args2);
     }
@@ -255,7 +265,7 @@ int main() {
     }
 
     //USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH THE SHELL
-    //(readline returned bad_command
+    //(readline returned bad_command)
     else if (!strcmp(args[0], "bad_command")) {
      printf("\e[38;2;255;60;0mPLEASE ENTER A COMMAND. DO NOT MESS WITH THE SHELL.\e[38;2;255;255;255m\n");
     }
@@ -265,11 +275,15 @@ int main() {
     else {
       printf("\e[38;2;255;60;0mCOMMAND NOT RECOGNIZED.\e[38;2;255;255;255m\n");
     }
-
-    free(args);
+    free(arg);
   }
-  free(pathname);
+  for (int i = 0; i < sizeof(args) / sizeof(char*); i++) {
+      free(args[i]);
+  }
+  free(args);
   free(arg);
+  free(pathname);
+  return EXIT_SUCCESS;
 }
 
 char* welcome() {
@@ -292,8 +306,12 @@ char* welcome() {
   c = getline(&pathname, &pathsize, stdin);
   check_neg(c, "getline failure in welcome"); //getline returns -1 on failure
 
+  // NOTE TO GRADERS: UNSURE HOW TO DO THIS WITHOUT MEMORY LOSS; MINIMIZED BY USE OF TMP
   pathname[strcspn(pathname, "\n")] = 0;
-  return pathname;
+  char* tmp = malloc(strlen(pathname) + 1); 
+  strcpy(tmp, pathname);
+  free(pathname);
+  return tmp;
 }
 
 #define MAXIMGLINESIZE 128
@@ -477,7 +495,7 @@ void visualize(TetrisGameState state) {
   printf("\n\e[38;2;255;60;0mTHIS IS YOUR BOARD:\n\n");
   printf("%s%s\n", "+---- Gameboard -----+", "\e[38;2;255;255;255m");
   // board width + 1
-  char print_str[BOARDW + 1];
+  char print_str[BOARDW + 1] = {};
 
   // will need to translate i, j, to index in board field to TGS
   int idx_in_board;
@@ -589,7 +607,6 @@ void play(char* pathname) {
   }
 }
 
-
 int recover(char** args, TetrisGameState* game, char** pathname) {
   int p1[2] = {0};
   check_neg((pipe(p1)), "error with pipe in recover");
@@ -654,11 +671,14 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
       printf("%-4d %-21s %-7d %-7d \n", i + 1, child_names[i], game2.score,
              game2.lines);
     }
+    
+    /* SWITCH FILE */
     char requested[10];
     int num;
     printf("Would you like to switch to one of these (y/n):");
     fgets(input, sizeof(input), stdin);
     input[strcspn(input, "\n")] = 0;
+
     if (!strcmp(input, "y")) {
       printf("Which quicksave (enter a #):");
       fgets(requested, sizeof(requested), stdin);
@@ -672,14 +692,35 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
         check_buffer(fp2, "tried to open invalid quicksave when switching in recover");
         fread(game, sizeof(TetrisGameState), 1, fp2);
         fclose(fp2);
+
+        /* FREE CHILD_NAMES */
+        for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
+            free(child_names[i]);
+        }
+        free(child_names);
+
         return 1;
 
       } else {
         printf("invalid file number \n");
+
+        /* FREE CHILD NAMES */
+        for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
+            free(child_names[i]);
+        }
+        free(child_names);
+
         return 0;
       }
     } else {
-      return 0;
+        /* FREE CHILD NAMEs */
+        printf("here\n");
+        for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
+            free(child_names[i]);
+        }
+        free(child_names);
+
+        return 0;
     }
   }
 }
