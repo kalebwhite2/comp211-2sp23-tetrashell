@@ -11,6 +11,10 @@
 #include "tetris.h"
 #include "train.h"
 
+/* COLORS */
+#define RED "\e[38;2;255;60;0m"
+#define WHITE "\e[38;2;255;255;255m"
+
 /* HELPER STRUCTS */
 typedef struct State {
   int i;
@@ -21,9 +25,9 @@ typedef struct Commands {
   char cmd[256];
 } Command;
 
-
 /* HELPER FUNCTIONS */
-char* read_line(TetrisGameState game, char* pathname, Command** prev_commands, int* from_previous);
+char* read_line(TetrisGameState game, char* pathname, Command** prev_commands,
+                int* from_previous);
 char** parse_args(char* args);
 char** parse_args_changes(char* args, char* path_name);
 char** parse_args_ranked(char* args, char* path_name);
@@ -31,11 +35,10 @@ char* welcome();
 int verify_save(TetrisGameState* game, char** pathname, FILE** fp);
 void print_image(FILE* fptr);
 
-
 /* ERROR CHECKERS */
 void check_buffer(void* buffer, char* output_text);
 void check_0(int to_check, char* output_text);
-void check_EOF(int to_check, char* output_text); 
+void check_EOF(int to_check, char* output_text);
 #define check_neg(to_check, output_text) check_EOF(to_check, output_text)
 
 /* COMMANDS */
@@ -53,7 +56,7 @@ int main() {
   printf("\e[38;2;255;255;255m\n");
 
   char* arg;
-  char** args;
+  char** args = NULL;  // can use this to tell if it's be malloc'd once or not
   char** args2;
   pid_t pid;
   /* FIND SAVE FILE */
@@ -63,23 +66,23 @@ int main() {
   int c;
   size_t pathsize = 256;
   TetrisGameState game;
-  
+
   FILE* fp;
   while (!verify_save(&game, &pathname, &fp)) {
-    printf("\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
-           "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
+    printf(
+        "\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
+        "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
 
     c = getline(&pathname, &pathsize, stdin);
-    //getline returns < 0 on failure
+    // getline returns < 0 on failure
     check_neg(c, "getline failed in verify_save!");
-    
+
     pathname[c - 1] = 0;
-    if (!strcmp(pathname, "exit") || !strcmp(pathname, "exit")) {
-        free(pathname);
-        return EXIT_SUCCESS;
+    if (!strcmp(pathname, "exit")) {
+      free(pathname);
+      return EXIT_SUCCESS;
     }
   }
-  
 
   /* INIT SAVE STATES */
   State state0, state1, state2;
@@ -87,47 +90,54 @@ int main() {
   state1.i = 0;
   state2.i = 0;
   State prev_game_states[3] = {state0, state1, state2};
-  int modify_called = 0;
 
   /* INIT COMMAND BUFFER */
   Command c1, c2, c3;
   c1.i = 0;
   c2.i = 0;
   c3.i = 0;
-  Command* prev_commands = malloc(3 * sizeof(Command)); 
-  prev_commands[0] = c1; prev_commands[1] = c2; prev_commands[2] = c3; 
+  Command* prev_commands = malloc(3 * sizeof(Command));
+  prev_commands[0] = c1;
+  prev_commands[1] = c2;
+  prev_commands[2] = c3;
   int from_previous = 0;
 
   /* MAIN LOOP */
-  while (strcmp((arg = read_line(game, pathname, &prev_commands, &from_previous)), "exit") && strcmp(arg, "e")
-         && strcmp(arg, "ex") && strcmp(arg, "exi")) {
+  while (
+      strcmp((arg = read_line(game, pathname, &prev_commands, &from_previous)),
+             "exit") &&
+      strcmp(arg, "e") && strcmp(arg, "ex") && strcmp(arg, "exi")) {
+    // have to free the old args
+    if (args != NULL) {
+      for (int i = 0; args[i] != NULL; i++) {
+        free(args[i]);
+      }
+    }
     // dup args because strtok will change them otherwise
     char* arg_copy = strdup(arg);
     args = parse_args(arg_copy);
     free(arg_copy);
 
-    //for buffering NOTE: not messing with malloc here. Max cmd size 256.
-    //there's a better way to do this which is both very obvious and beyond me
+    // for buffering NOTE: not messing with malloc here. Max cmd size 256.
+    // there's a better way to do this which is both very obvious and beyond me
     if (!from_previous) {
-        if (prev_commands[2].i) {
-           strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
-           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
-           strcpy(prev_commands[0].cmd, arg);
-        } else if (prev_commands[1].i) {
-           strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
-           prev_commands[2].i = 1;
-           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
-           strcpy(prev_commands[0].cmd, arg);
-        } else if (prev_commands[0].i) {
-           strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
-           prev_commands[1].i = 1;
-           strcpy(prev_commands[0].cmd, arg);
-        } else {
-           prev_commands[0].i = 1;
-           strcpy(prev_commands[0].cmd, arg);
-        }
+      if (prev_commands[2].i) {
+        strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
+        strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+        strcpy(prev_commands[0].cmd, arg);
+      } else if (prev_commands[1].i) {
+        strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
+        prev_commands[2].i = 1;
+        strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+        strcpy(prev_commands[0].cmd, arg);
+        strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
+        prev_commands[1].i = 1;
+        strcpy(prev_commands[0].cmd, arg);
+      } else {
+        prev_commands[0].i = 1;
+        strcpy(prev_commands[0].cmd, arg);
+      }
     }
-
 
     if (!strcmp(args[0], "recover") || !strcmp(args[0], "re") ||
         !strcmp(args[0], "rec") || !strcmp(args[0], "reco") ||
@@ -143,71 +153,69 @@ int main() {
         if (prev_game_states[2].i) {
           prev_game_states[2].i = 0;
         }
-        modify_called = 0;
       }
     }
 
-    //MODIFY
+    // MODIFY
     else if (!strcmp(args[0], "modify") || !strcmp(args[0], "m") ||
-        !strcmp(args[0], "mo") || !strcmp(args[0], "mod") ||
-        !strcmp(args[0], "modi") || !strcmp(args[0], "modif")) {
+             !strcmp(args[0], "mo") || !strcmp(args[0], "mod") ||
+             !strcmp(args[0], "modi") || !strcmp(args[0], "modif")) {
       // edit array of previous game states
-      if (!modify_called) {
-        modify_called = 1;
+      if (prev_game_states[2].i) {
+        // move everything back an index
+        memcpy(&prev_game_states[2].g, &prev_game_states[1].g,
+               sizeof(TetrisGameState));
+        memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
+               sizeof(TetrisGameState));
+        prev_game_states[0].g = game;
+      } else if (prev_game_states[1].i) {
+        // move everything back an index
+        memcpy(&prev_game_states[2].g, &prev_game_states[1].g,
+               sizeof(TetrisGameState));
+        memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
+               sizeof(TetrisGameState));
+        prev_game_states[0].g = game;
+        // set 2's i value
+        prev_game_states[2].i = 1;
+      } else if (prev_game_states[0].i) {
+        // move everything back an index
+        memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
+               sizeof(TetrisGameState));
+        prev_game_states[0].g = game;
+        // set 1's i value
+        prev_game_states[1].i = 1;
       } else {
-        if (prev_game_states[2].i) {
-          // move everything back an index
-          memcpy(&prev_game_states[2].g, &prev_game_states[1].g,
-                 sizeof(TetrisGameState));
-          memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
-                 sizeof(TetrisGameState));
-          prev_game_states[0].g = game;
-        } else if (prev_game_states[1].i) {
-          // move everything back an index
-          memcpy(&prev_game_states[2].g, &prev_game_states[1].g,
-                 sizeof(TetrisGameState));
-          memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
-                 sizeof(TetrisGameState));
-          prev_game_states[0].g = game;
-          // set 2's i value
-          prev_game_states[2].i = 1;
-        } else {
-          // move everything back an index
-          memcpy(&prev_game_states[1].g, &prev_game_states[0].g,
-                 sizeof(TetrisGameState));
-          // set 1's i value
-          prev_game_states[0].g = game;
-          prev_game_states[1].i = 1;
-        }
+        prev_game_states[0].g = game;
+        prev_game_states[0].i = 1;
       }
 
       // call to modify
       args2 = parse_args_changes(arg, pathname);
       modify(args2, &game, &pathname);
-      for (int i = 0; i < sizeof(args2) / sizeof(char*); i++) {
-          free(args2[i]);
+      for (int i = 0; args2[i] != NULL; i++) {
+        free(args2[i]);
       }
       free(args2);
     }
 
-    //HELP
+    // HELP
     else if (!strcmp(args[0], "help") || !strcmp(args[0], "h") ||
-        !strcmp(args[0], "he") || !strcmp(args[0], "hel")) {
+             !strcmp(args[0], "he") || !strcmp(args[0], "hel")) {
       help(args);
     }
 
-    //INFO
+    // INFO
     else if (!strcmp(args[0], "info") || !strcmp(args[0], "i") ||
-        !strcmp(args[0], "in") || !strcmp(args[0], "inf")) {
+             !strcmp(args[0], "in") || !strcmp(args[0], "inf")) {
       printf("Current savefile: %s \n", pathname);
       printf("Score: %d \n", game.score);
       printf("Lines: %d \n", game.lines);
     }
 
-    //SWITCH
+    // SWITCH
     else if (!strcmp(args[0], "switch") || !strcmp(args[0], "s") ||
-        !strcmp(args[0], "sw") || !strcmp(args[0], "swi") ||
-        !strcmp(args[0], "swit") || !strcmp(args[0], "switc")) {
+             !strcmp(args[0], "sw") || !strcmp(args[0], "swi") ||
+             !strcmp(args[0], "swit") || !strcmp(args[0], "switc")) {
       // switch returns 1 on success
       if (switch_func(args, &game, &pathname)) {
         // reset prev_game_states
@@ -220,17 +228,16 @@ int main() {
         if (prev_game_states[2].i) {
           prev_game_states[2].i = 0;
         }
-        modify_called = 0;
       }
     }
 
-    //CHECK
+    // CHECK
     else if (!strcmp(args[0], "check") || !strcmp(args[0], "c") ||
-        !strcmp(args[0], "ch") || !strcmp(args[0], "che") ||
-        !strcmp(args[0], "chec")) {
+             !strcmp(args[0], "ch") || !strcmp(args[0], "che") ||
+             !strcmp(args[0], "chec")) {
       args2 = parse_args_changes(arg, pathname);
       pid_t pid = fork();
-      check_neg((int) pid, "fork failed at check!");
+      check_neg((int)pid, "fork failed at check!");
       if (pid == 0) {
         execve("/playpen/a5/check", args2, NULL);
       } else {
@@ -238,21 +245,21 @@ int main() {
         wait(&ret);
       }
 
-      for (int i = 0; i < sizeof(args2) / sizeof(char*); i++) {
-          free(args2[i]);
+      for (int i = 0; args2[i] != NULL; i++) {
+        free(args2[i]);
       }
       free(args2);
     }
 
-    //RANK
+    // RANK
     else if (!strcmp(args[0], "rank") || !strcmp(args[0], "ra") ||
-        !strcmp(args[0], "ran")) {
+             !strcmp(args[0], "ran")) {
       rank(arg, args, &pathname);
     }
 
-    //UNDO
+    // UNDO
     else if (!strcmp(args[0], "undo") || !strcmp(args[0], "u") ||
-        !strcmp(args[0], "un") || !strcmp(args[0], "und")) {
+             !strcmp(args[0], "un") || !strcmp(args[0], "und")) {
       if (prev_game_states[2].i) {
         memcpy(&game, &prev_game_states[0].g, sizeof(TetrisGameState));
         memcpy(&prev_game_states[0].g, &prev_game_states[1].g,
@@ -273,18 +280,18 @@ int main() {
       }
     }
 
-    //VISUALIZE
+    // VISUALIZE
     else if (!strcmp(args[0], "visualize") || !strcmp(args[0], "v") ||
-        !strcmp(args[0], "vi") || !strcmp(args[0], "vis") ||
-        !strcmp(args[0], "visu") || !strcmp(args[0], "visua") ||
-        !strcmp(args[0], "visual") || !strcmp(args[0], "visuali") ||
-        !strcmp(args[0], "visualiz")) {
+             !strcmp(args[0], "vi") || !strcmp(args[0], "vis") ||
+             !strcmp(args[0], "visu") || !strcmp(args[0], "visua") ||
+             !strcmp(args[0], "visual") || !strcmp(args[0], "visuali") ||
+             !strcmp(args[0], "visualiz")) {
       visualize(game);
     }
 
-    //TRAIN
+    // TRAIN
     else if (!strcmp(args[0], "train") || !strcmp(args[0], "tr") ||
-        !strcmp(args[0], "tra") || !strcmp(args[0], "trai")) {
+             !strcmp(args[0], "tra") || !strcmp(args[0], "trai")) {
       train();
     }
 
@@ -295,38 +302,45 @@ int main() {
       // reopen file to read back in the game stats
       FILE* fp;
       check_buffer(fp = fopen(pathname, "r"), "fopen failed in play!");
-      check_0((fread(&game, sizeof(TetrisGameState), 1, fp)), "fread failed in play!");
-      check_EOF((fclose(fp)), "fclose failed in play");
-      printf(
+      check_0((fread(&game, sizeof(TetrisGameState), 1, fp)), "fread failed in
+    play!"); check_EOF((fclose(fp)), "fclose failed in play"); printf(
           "\e[38;2;255;60;0mYOUR RESULTS HAVE BEEN WRITTEN TO YOUR "
           "SAVE.\e[38;2;255;255;255m\n");
     }
     */
 
-    //USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH THE SHELL
-    //(readline returned bad_command)
+    // USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH
+    // THE SHELL (readline returned bad_command)
     else if (!strcmp(args[0], "bad_command")) {
-     printf("\e[38;2;255;60;0mPLEASE ENTER A COMMAND. DO NOT MESS WITH THE SHELL.\e[38;2;255;255;255m\n");
+      printf(
+          "\e[38;2;255;60;0mPLEASE ENTER A COMMAND. DO NOT MESS WITH THE "
+          "SHELL.\e[38;2;255;255;255m\n");
     }
 
-
-    //UNRECOGNIZED COMMAND
+    // UNRECOGNIZED COMMAND
     else {
       printf("\e[38;2;255;60;0mCOMMAND NOT RECOGNIZED.\e[38;2;255;255;255m\n");
     }
 
-    //suspect this is necessary because strcpy does something with permissions?
-    if (!from_previous) {
-        free(arg);
+    // suspect this is necessary because strcpy does something with permissions?
+    // also shouldn't try to free when bad_command returned, which read_line
+    // does if EOF or \n is entered
+    if (!from_previous && strcmp(args[0], "bad_command")) {
+      free(arg);
     }
   }
-  for (int i = 0; i < sizeof(args) / sizeof(char*); i++) {
+
+  /* FREE MALLOC'D */
+  if (args != NULL) {
+    for (int i = 0; args[i] != NULL; i++) {
       free(args[i]);
+    }
+    free(args);
   }
-  free(args);
   free(arg);
   free(pathname);
   free(prev_commands);
+
   return EXIT_SUCCESS;
 }
 
@@ -348,16 +362,11 @@ char* welcome() {
 
   int c;
   c = getline(&pathname, &pathsize, stdin);
-  check_neg(c, "getline failure in welcome"); //getline returns -1 on failure
+  check_neg(c, "getline failure in welcome");  // getline returns -1 on failure
 
-  // NOTE TO GRADERS: UNSURE HOW TO DO THIS WITHOUT MEMORY LOSS; MINIMIZED BY USE OF TMP
   pathname[strcspn(pathname, "\n")] = 0;
-  char* tmp = malloc(strlen(pathname) + 1); 
-  strcpy(tmp, pathname);
-  free(pathname);
-  return tmp;
+  return pathname;
 }
-
 
 #define MAXIMGLINESIZE 128
 void print_image(FILE* imgpath) {
@@ -391,16 +400,15 @@ int verify_save(TetrisGameState* game, char** pathname, FILE** fp) {
   return 1;
 }
 
-#define RED "\e[38;2;255;60;0m"
-#define WHITE "\e[38;2;255;255;255m"
-char* read_line(TetrisGameState game, char* pathname, Command** prev_commands, int* from_previous) {
+char* read_line(TetrisGameState game, char* pathname, Command** prev_commands,
+                int* from_previous) {
   int line_size = 256, ch, idx = 0, format_idx = 0;
   char* buffer = malloc(sizeof(char) * line_size);
   check_buffer(buffer, "malloc failed in read_line!");
   char* username = getlogin();
   *from_previous = 0;
 
-  //shell command line
+  // shell command line
   char name[7];
   while (format_idx < 4) {
     name[format_idx] = pathname[format_idx];
@@ -412,58 +420,64 @@ char* read_line(TetrisGameState game, char* pathname, Command** prev_commands, i
   }
 
   /* SHELL INPUT LINE */
-  printf("%s%s@TShell[%s%s%s][%s%d/%d%s] tetrashell>%s ", username, RED, WHITE, name, 
-         RED, WHITE, game.score, game.lines, RED, WHITE);
+  printf("%s%s@TShell[%s%s%s][%s%d/%d%s] tetrashell>%s ", username, RED, WHITE,
+         name, RED, WHITE, game.score, game.lines, RED, WHITE);
 
-  //read in line
+  // read in line
   while (1) {
     ch = getchar();
 
     if (ch == EOF || ch == '\n') {
-      //edge case: \n or EOF entered right away
+      // edge case: \n or EOF entered right away
       if (idx == 0) {
-          char* r = "bad_command";
-          return r;
+        char* r = "bad_command";
+        return r;
       }
       buffer[idx] = '\0';
       return buffer;
-    } else if (ch == '\033' && (ch = getchar()) == '[' && (ch = getchar()) == 'A') { //redo functionality - up arrow ansi escape code is \033[A
-        *from_previous = 1;
-        //move out of prev_commands - move in every time we read a line 
-        if ((*prev_commands)[2].i) {
-           strcpy(buffer, (*prev_commands)[0].cmd);
-           strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
-           strcpy((*prev_commands)[1].cmd, (*prev_commands)[2].cmd);
-           (*prev_commands)[2].i = 0;
-        } else if ((*prev_commands)[1].i) {
-           strcpy(buffer, (*prev_commands)[0].cmd);
-           strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
-           (*prev_commands)[1].i = 0;
-        } else if ((*prev_commands)[0].i) {
-           strcpy(buffer, (*prev_commands)[0].cmd);
-           (*prev_commands)[0].i = 0;
-        } else {
-           printf("%s%s%s\n", RED, "UP ARROW PRESSED WITH NO COMMANDS BUFFERED.", WHITE);
-           //clear stdin
-           while (getchar() != '\n') {} 
-           char* r = "bad_command";
-           return r;
+    } else if (ch == '\033' && (ch = getchar()) == '[' &&
+               (ch = getchar()) == 'A') {  // redo functionality - up arrow ansi
+                                           // escape code is \033[A
+      *from_previous = 1;
+      // move out of prev_commands - move in every time we read a line
+      if ((*prev_commands)[2].i) {
+        strcpy(buffer, (*prev_commands)[0].cmd);
+        strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
+        strcpy((*prev_commands)[1].cmd, (*prev_commands)[2].cmd);
+        (*prev_commands)[2].i = 0;
+      } else if ((*prev_commands)[1].i) {
+        strcpy(buffer, (*prev_commands)[0].cmd);
+        strcpy((*prev_commands)[0].cmd, (*prev_commands)[1].cmd);
+        (*prev_commands)[1].i = 0;
+      } else if ((*prev_commands)[0].i) {
+        strcpy(buffer, (*prev_commands)[0].cmd);
+        (*prev_commands)[0].i = 0;
+      } else {
+        printf("%s%s%s\n", RED, "UP ARROW PRESSED WITH NO COMMANDS BUFFERED.",
+               WHITE);
+        // clear stdin
+        while (getchar() != '\n') {
         }
+        char* r = "bad_command";
+        return r;
+      }
 
-        printf("%s%s%s%s%s\n", RED, "Run previous command: ", buffer, "? (y/n)", WHITE);
-        char yn;
-        scanf(" %c", &yn);
-        if (yn == 'y') {
-            //clear stdin
-            while (getchar() != '\n') {} 
-            return buffer;
+      printf("%s%s%s%s%s\n", RED, "Run previous command: ", buffer, "? (y/n)",
+             WHITE);
+      char yn;
+      scanf(" %c", &yn);
+      if (yn == 'y') {
+        // clear stdin
+        while (getchar() != '\n') {
         }
+        return buffer;
+      }
     } else {
       buffer[idx] = ch;
       idx++;
     }
 
-    //resize buf
+    // resize buf
     if (idx >= line_size) {
       line_size *= 2;
       buffer = realloc(buffer, sizeof(char) * line_size);
@@ -582,11 +596,11 @@ void visualize(TetrisGameState state) {
     for (int j = 0; j < BLOCKS_WIDE; j++) {
       idx_in_board = 10 * i + j;
       if (!state.board[idx_in_board]) {
-          print_str[2 * j] = ' ';
-          print_str[2 * j + 1] = ' ';
+        print_str[2 * j] = ' ';
+        print_str[2 * j + 1] = ' ';
       } else {
-          print_str[2 * j] = state.board[idx_in_board];
-          print_str[2 * j + 1] = state.board[idx_in_board];
+        print_str[2 * j] = state.board[idx_in_board];
+        print_str[2 * j + 1] = state.board[idx_in_board];
       }
     }
 
@@ -746,12 +760,13 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
       child_file = fopen(child_names[i], "rb");
       check_buffer(child_file, "open failed in recover");
       TetrisGameState game2;
-      check_0((fread(&game2, sizeof(TetrisGameState), 1, child_file)), "read failed in recover");
+      check_0((fread(&game2, sizeof(TetrisGameState), 1, child_file)),
+              "read failed in recover");
       fclose(child_file);
       printf("%-4d %-21s %-7d %-7d \n", i + 1, child_names[i], game2.score,
              game2.lines);
     }
-    
+
     /* SWITCH FILE */
     char requested[10];
     int num;
@@ -769,13 +784,14 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
         *pathname = child_names[num];
         FILE* fp2;
         fp2 = fopen(*pathname, "rb");
-        check_buffer(fp2, "tried to open invalid quicksave when switching in recover");
+        check_buffer(
+            fp2, "tried to open invalid quicksave when switching in recover");
         fread(game, sizeof(TetrisGameState), 1, fp2);
         fclose(fp2);
 
         /* FREE CHILD_NAMES */
         for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
-            free(child_names[i]);
+          free(child_names[i]);
         }
         free(child_names);
 
@@ -786,144 +802,167 @@ int recover(char** args, TetrisGameState* game, char** pathname) {
 
         /* FREE CHILD NAMES */
         for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
-            free(child_names[i]);
+          free(child_names[i]);
         }
         free(child_names);
 
         return 0;
       }
     } else {
-        /* FREE CHILD NAMEs */
-        printf("here\n");
-        for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
-            free(child_names[i]);
-        }
-        free(child_names);
+      /* FREE CHILD NAMEs */
+      printf("here\n");
+      for (int i = 0; i < sizeof(child_names) / sizeof(char*); i++) {
+        free(child_names[i]);
+      }
+      free(child_names);
 
-        return 0;
+      return 0;
     }
   }
 }
 
 void modify(char** args, TetrisGameState* game, char** pathname) {
-  //normal execution 
+  // normal execution
   if (!strcmp(args[1], "lines") || !strcmp(args[1], "score")) {
-      pid_t pid = fork();
-      if (pid == 0) {
-        execve("/playpen/a5/modify", args, NULL);
-      } else {
-        int ret;
-        wait(&ret);
-      }
+    pid_t pid = fork();
 
-      // reopen file to read back in the game stats
-      FILE* fp;
-      fp = fopen(*pathname, "r");
-      check_buffer(fp, "open failed in modify");
-      check_0((fread(game, sizeof(TetrisGameState), 1, fp)), "couldn't read back from modify");
-      fclose(fp);
-      return;
+    if (pid == 0) {
+      execve("/playpen/a5/modify", args, NULL);
+    } else {
+      int ret;
+      wait(&ret);
+    }
+
+    // reopen file to read back in the game stats
+    FILE* fp;
+    fp = fopen(*pathname, "r");
+    check_buffer(fp, "open failed in modify");
+    check_0((fread(game, sizeof(TetrisGameState), 1, fp)),
+            "couldn't read back from modify");
+    fclose(fp);
+    return;
   }
 
-  //next piece
+  // next piece
   else if (!strcmp(args[1], "next_piece")) {
-      char* str_part;
-      long int next_piece = strtol(args[2], &str_part, 10);
-      //make sure str_part is empty --> there should be nothing but ints in the str
-      if (strcmp(str_part, "")) {
-        printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
-              " TO MODIFY NEXT PIECE. \e[38;2;255;255;255m\n");
-        return;
-      }
-      if (next_piece > 18 || next_piece < 0) {
-        printf("\e[38;2;255;60;0mAMOUNT GIVEN TO MODIFY NEXT PIECE IS TOO LARGE OR TOO SMALL."
-              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 18. \e[38;2;255;255;255m\n");
-        return;
+    char* str_part;
+    long int next_piece = strtol(args[2], &str_part, 10);
+    // make sure str_part is empty --> there should be nothing but ints in the
+    // str
+    if (strcmp(str_part, "")) {
+      printf(
+          "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
+          " TO MODIFY NEXT PIECE. \e[38;2;255;255;255m\n");
+      return;
+    }
+    if (next_piece > 18 || next_piece < 0) {
+      printf(
+          "\e[38;2;255;60;0mAMOUNT GIVEN TO MODIFY NEXT PIECE IS TOO LARGE OR "
+          "TOO SMALL."
+          "\nPLEASE ENTER A VALUE BETWEEN 0 AND 18. \e[38;2;255;255;255m\n");
+      return;
+    }
 
-      }
+    printf("%s%s%s%s%s\n", RED, "Quicksave ", *pathname, " modified.", WHITE);
 
-      //cast is fine bc short contains all acceptable values
-      game->next_piece = (short) next_piece;   
-
-      
+    // cast is fine bc short contains all acceptable values
   }
 
-  //board
+  // board
   else if (!strcmp(args[1], "board")) {
-     char* str_part_one, * str_part_two;
-     long int x = strtol(args[2], &str_part_one, 10);
-     long int y = strtol(args[3], &str_part_two, 10);
-     char * print_str = args[4];
-     //make sure str_part is empty --> there should be nothing but ints in the str
-     if (strcmp(str_part_one, "") || strcmp(str_part_two, "")) {
-        printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN TO MODIFY BOARD. "
-               " PLEASE ENTER COMMAND IN FORMAT \e[38;2;255;255;255m\n"
-               " modify board int int str\n"); 
-        return;
-     }
-     // x and y must be acceptable values for computation to be correct
-     if (x < 0 || x > 9) {
-        printf("\e[38;2;255;60;0mX VALUE GIVEN TO MODIFY BOARD IS TOO LARGE OR SMALL. "
-              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 9. \e[38;2;255;255;255m\n");
-        return;
-     }
-     if (y < 0 || y > 19) {
-        printf("\e[38;2;255;60;0mY VALUE GIVEN TO MODIFY BOARD IS TOO LARGE OR SMALL. "
-              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 19. \e[38;2;255;255;255m\n");
-        return;
-     }
-     int start_idx = 10 * y + x;
-     //make sure string to print doesn't flow out of board
-     if (strlen(print_str) + start_idx > 199) {
-        printf("\e[38;2;255;60;0mSTRING WOULD OVERFLOW BOARD. "
-              "\nPLEASE MAKE STRING SHORTER OR START EARLIER IN BOARD. \e[38;2;255;255;255m\n");
-        return;
-     }
-     for (int i = 0; i < strlen(print_str); i++) {
-        game->board[i + start_idx] = print_str[i];
-     }
+    char *str_part_one, *str_part_two;
+    long int x = strtol(args[2], &str_part_one, 10);
+    long int y = strtol(args[3], &str_part_two, 10);
+    char* print_str = args[4];
+    // make sure str_part is empty --> there should be nothing but ints in the
+    // str
+    if (strcmp(str_part_one, "") || strcmp(str_part_two, "")) {
+      printf(
+          "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN TO MODIFY BOARD. "
+          " PLEASE ENTER COMMAND IN FORMAT \e[38;2;255;255;255m\n"
+          " modify board int int str\n");
+      return;
+    }
+    // x and y must be acceptable values for computation to be correct
+    if (x < 0 || x > 9) {
+      printf(
+          "\e[38;2;255;60;0mX VALUE GIVEN TO MODIFY BOARD IS TOO LARGE OR "
+          "SMALL. "
+          "\nPLEASE ENTER A VALUE BETWEEN 0 AND 9. \e[38;2;255;255;255m\n");
+      return;
+    }
+    if (y < 0 || y > 19) {
+      printf(
+          "\e[38;2;255;60;0mY VALUE GIVEN TO MODIFY BOARD IS TOO LARGE OR "
+          "SMALL. "
+          "\nPLEASE ENTER A VALUE BETWEEN 0 AND 19. \e[38;2;255;255;255m\n");
+      return;
+    }
+    int start_idx = 10 * y + x;
+    // make sure string to print doesn't flow out of board
+    if (strlen(print_str) + start_idx > 199) {
+      printf(
+          "\e[38;2;255;60;0mSTRING WOULD OVERFLOW BOARD. "
+          "\nPLEASE MAKE STRING SHORTER OR START EARLIER IN BOARD. "
+          "\e[38;2;255;255;255m\n");
+      return;
+    }
+    for (int i = 0; i < strlen(print_str); i++) {
+      game->board[i + start_idx] = print_str[i];
+    }
+    printf("%s%s%s%s%s\n", RED, "Quicksave ", *pathname, " modified.", WHITE);
 
   }
 
   else if (!strcmp(args[1], "current_piece")) {
-     char* str_part_one, * str_part_two;
-     long int x = strtol(args[2], &str_part_one, 10);
-     long int y = strtol(args[3], &str_part_two, 10);
+    char *str_part_one, *str_part_two;
+    long int x = strtol(args[2], &str_part_one, 10);
+    long int y = strtol(args[3], &str_part_two, 10);
 
-     if (strcmp(str_part_one, "") || strcmp(str_part_two, "")) {
-        printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN TO MODIFY CURRENT_PIECE. "
-               " PLEASE ENTER COMMAND IN FORMAT \e[38;2;255;255;255m\n"
-               " modify current_piece int int\n"); 
-        return;
-     }
-     // x and y must be acceptable values for computation to be correct
-     if (x < 0 || x > 9) {
-        printf("\e[38;2;255;60;0mX VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE OR SMALL. "
-              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 9. \e[38;2;255;255;255m\n");
-        return;
-     }
-     if (y < 0 || y > 19) {
-        printf("\e[38;2;255;60;0mY VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE OR SMALL. "
-              "\nPLEASE ENTER A VALUE BETWEEN 0 AND 19. \e[38;2;255;255;255m\n");
-        return;
-     }
-     int start_idx = 10 * y + x;
-     game->current_piece = start_idx;
-
+    if (strcmp(str_part_one, "") || strcmp(str_part_two, "")) {
+      printf(
+          "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN TO MODIFY "
+          "CURRENT_PIECE. "
+          " PLEASE ENTER COMMAND IN FORMAT \e[38;2;255;255;255m\n"
+          " modify current_piece int int\n");
+      return;
+    }
+    // x and y must be acceptable values for computation to be correct
+    if (x < 0 || x > 9) {
+      printf(
+          "\e[38;2;255;60;0mX VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE "
+          "OR SMALL. "
+          "\nPLEASE ENTER A VALUE BETWEEN 0 AND 9. \e[38;2;255;255;255m\n");
+      return;
+    }
+    if (y < 0 || y > 19) {
+      printf(
+          "\e[38;2;255;60;0mY VALUE GIVEN TO MODIFY CURRENT_PIECE IS TOO LARGE "
+          "OR SMALL. "
+          "\nPLEASE ENTER A VALUE BETWEEN 0 AND 19. \e[38;2;255;255;255m\n");
+      return;
+    }
+    int start_idx = 10 * y + x;
+    game->current_piece = start_idx;
+    printf("%s%s%s%s%s\n", RED, "Quicksave ", *pathname, " modified.", WHITE);
   }
 
   else {
-      printf("\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
-              "TO MODIFY. \e[38;2;255;255;255m\n");
-      return;
+    printf(
+        "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
+        "TO MODIFY. \e[38;2;255;255;255m\n");
+    return;
   }
 
-  //the code to write modify next_piece, board is the same, so we'll combine that here
+  // the code to write modify next_piece, board is the same, so we'll combine
+  // that here
   if (!strcmp(args[1], "board") || !strcmp(args[1], "next_piece")) {
-      FILE * fp; 
-      check_buffer((fp = fopen(*pathname, "wb")), "file open to write failed in modify!");
-      check_0((fwrite(game, sizeof(TetrisGameState), 1, fp)), "write failed in modify");
-      fclose(fp);
+    FILE* fp;
+    check_buffer((fp = fopen(*pathname, "wb")),
+                 "file open to write failed in modify!");
+    check_0((fwrite(game, sizeof(TetrisGameState), 1, fp)),
+            "write failed in modify");
+    fclose(fp);
   }
 }
 
@@ -967,13 +1006,13 @@ void help(char** args) {
     printf("Prints the current score and lines.\n");
   }
   if (!strcmp(args[1], "switch")) {
-    printf("Changes the current file to the second argument called with "
-           "switch. This will reset the undo buffer.\n");
+    printf(
+        "Changes the current file to the second argument called with "
+        "switch. This will reset the undo buffer.\n");
   }
 }
 
 int switch_func(char** args, TetrisGameState* game, char** pathname) {
-  //TODO: print help when command called with no arg[1]:
   char* current;
   current = *pathname;
   *pathname = args[1];
@@ -982,15 +1021,18 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
   int c;
 
   while (!verify_save(game, pathname, &fp2)) {
-    printf("\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
-           "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
+    printf(
+        "\e[38;2;255;60;0mFINDING, READING, OR SAVING FROM FILE FAILED.\n"
+        "PLEASE ENTER ANOTHER PATH, OR EXIT TO QUIT. \e[38;2;255;255;255m\n");
 
     c = getline(pathname, &pathsize, stdin);
-    check_neg(c, "getline failure while getting a valid save"); //getline returns < 0 on failure
-    
+    check_neg(c,
+              "getline failure while getting a valid save");  // getline returns
+                                                              // < 0 on failure
+
     (*pathname)[c - 1] = 0;
     if (!strcmp(*pathname, "exit") || !strcmp(*pathname, "exit")) {
-        return EXIT_FAILURE;
+      return EXIT_FAILURE;
     }
   }
 
@@ -998,35 +1040,118 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
   return 1;
 }
 
-
 void rank(char* arg, char** args, char** pathname) {
+  bool one = false;
+  char* username = getlogin();
+
+  //set args if none given
   if (!args[1]) {
     args = parse_args_ranked(arg, *pathname);
     args[0] = "rank";
     args[1] = "score";
-    args[2] = "10";
+    args[2] = "55";
     args[3] = "\n";
+    one = true;
   }
   if (!args[2]) {
     args = parse_args_changes(arg, *pathname);
     args[2] = "10";
   }
+
+  //set up piping
   int p[2];
+  int p2[2];
+  check_neg(pipe(p2), "pipe failed in rank");
   check_neg((pipe(p)), "pipe failed in rank");
   pid_t pid = fork();
   check_neg(pid, "fork failed in rank");
+
+  //child
   if (pid == 0) {
     close(p[1]);
     dup2(p[0], STDIN_FILENO);
+    dup2(p2[1], fileno(stdout));
     args[0] = "/playpen/a5/rank";
     args[3] = "uplink";
     execve("/playpen/a5/rank", args, NULL);
-  } else {
+  } else { //parent
+    close(p2[1]);
     close(p[0]);
-    check_0((write(p[1], *pathname, strlen(*pathname))), "write from shell to rank failed");
+    check_0((write(p[1], *pathname, strlen(*pathname))),
+            "write from shell to rank failed");
+    close(p[1]);
+    char output2[4096];
+    char** child_names2 = malloc(sizeof(char*));
+    child_names2[0] = malloc(sizeof(char) * 4096);
+    unsigned int inner2 = 0;
+    unsigned int outer2 = 0;
+    unsigned int count2 = 1;
+    ssize_t sizes2 = 0;
+    while ((sizes2 = read(p2[0], output2, 4096)) > 0) {
+      for (ssize_t g = 0; g < sizes2; ++g) {
+        child_names2[outer2][inclang-format -i --style=Google rank.cner2++] = output2[g];
+        if (output2[g] == '\n') {
+          child_names2[outer2++][inner2 - 1] = 0;
+          inner2 = 0;
+          if (outer2 >= count2) {
+            count2++;
+            child_names2 = realloc(child_names2, sizeof(char*) * count2);
+            child_names2[outer2] = malloc(sizeof(char) * 4096);
+          }
+        }
+      }
+    }
     int ret;
     close(p[1]);
+    close(p2[0]);
     wait(&ret);
+
+	//print args
+    if (one) {
+      int current;
+      char new1[80];
+      snprintf(new1, sizeof(new1), "%s/%s", username, *pathname);
+      for (int i = 0; i < count2 - 1; i++) {
+        if (!strcmp(child_names2[i], new1)) {
+          current = i;
+          break;
+        }
+      }
+      if (current < 5 && current != 0) {
+        for (int b = 0; b < count2 + 6; b++) {
+          if (b == current) {
+            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
+          } else {
+            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
+          }
+        }
+      } else if (current > count2 - 5) {
+        for (int b = current - 5; b < count2 - 1; b++) {
+          if (b == current) {
+            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
+          } else {
+            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
+          }
+        }
+      } else if (current == 0) {
+        for (int b = 0; b < count2 - 1; b++) {
+            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
+        }
+		printf("%s%s%s\n", RED, "YOU ARE NOT ON THE LEADERBOARD.\n", WHITE);
+      } else {
+        for (int b = current - 5; b < current + 6; b++) {
+          if (b == current) {
+            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
+          } else {
+            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < count2 - 1; i++) {
+        printf("%-3d %s\n", i + 1, child_names2[i]);
+      }
+    }
   }
 }
 
@@ -1051,4 +1176,3 @@ void check_EOF(int to_check, char* output_text) {
     exit(EXIT_FAILURE);
   }
 }
-
