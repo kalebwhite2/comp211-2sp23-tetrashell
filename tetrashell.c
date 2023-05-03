@@ -43,7 +43,7 @@ void check_EOF(int to_check, char* output_text);
 
 /* COMMANDS */
 void visualize(TetrisGameState state);
-/*void play(char* pathname);*/
+/* void play(char* pathname);*/
 int recover(char** args, TetrisGameState* game, char** pathname);
 void modify(char** args, TetrisGameState* game, char** pathname);
 int switch_func(char** args, TetrisGameState* game, char** pathname);
@@ -56,7 +56,7 @@ int main() {
   printf("\e[38;2;255;255;255m\n");
 
   char* arg;
-  char** args = NULL;  // can use this to tell if it's be malloc'd once or not
+  char** args;  // can use this to tell if it's be malloc'd once or not
   char** args2;
   pid_t pid;
   /* FIND SAVE FILE */
@@ -107,12 +107,6 @@ int main() {
       strcmp((arg = read_line(game, pathname, &prev_commands, &from_previous)),
              "exit") &&
       strcmp(arg, "e") && strcmp(arg, "ex") && strcmp(arg, "exi")) {
-    // have to free the old args
-    if (args != NULL) {
-      for (int i = 0; args[i] != NULL; i++) {
-        free(args[i]);
-      }
-    }
     // dup args because strtok will change them otherwise
     char* arg_copy = strdup(arg);
     args = parse_args(arg_copy);
@@ -120,7 +114,7 @@ int main() {
 
     // for buffering NOTE: not messing with malloc here. Max cmd size 256.
     // there's a better way to do this which is both very obvious and beyond me
-    if (!from_previous) {
+    if (!from_previous && strcmp(arg, "bad_command")) {
       if (prev_commands[2].i) {
         strcpy(prev_commands[2].cmd, prev_commands[1].cmd);
         strcpy(prev_commands[1].cmd, prev_commands[0].cmd);
@@ -295,19 +289,22 @@ int main() {
       train();
     }
 
-    /*
+
+	/*
     //PLAY
     else if (!strcmp(args[0], "play")) {
       play(pathname);
       // reopen file to read back in the game stats
       FILE* fp;
       check_buffer(fp = fopen(pathname, "r"), "fopen failed in play!");
-      check_0((fread(&game, sizeof(TetrisGameState), 1, fp)), "fread failed in
-    play!"); check_EOF((fclose(fp)), "fclose failed in play"); printf(
+      check_0((fread(&game, sizeof(TetrisGameState), 1, fp)), "fread failed in"
+    "play!"); 
+	  check_EOF((fclose(fp)), "fclose failed in play"); 
+	  printf(
           "\e[38;2;255;60;0mYOUR RESULTS HAVE BEEN WRITTEN TO YOUR "
           "SAVE.\e[38;2;255;255;255m\n");
     }
-    */
+	*/
 
     // USER TRIED TO HIT ENTER RIGHT AWAY OR ENTERED EOF RIGHT AWAY TO MESS WITH
     // THE SHELL (readline returned bad_command)
@@ -322,22 +319,23 @@ int main() {
       printf("\e[38;2;255;60;0mCOMMAND NOT RECOGNIZED.\e[38;2;255;255;255m\n");
     }
 
+	/* FREE ARGS AND ARG SO THEY CAN BE REASSIGNED */
     // suspect this is necessary because strcpy does something with permissions?
     // also shouldn't try to free when bad_command returned, which read_line
     // does if EOF or \n is entered
     if (!from_previous && strcmp(args[0], "bad_command")) {
       free(arg);
     }
+	if (strcmp(args[0], "bad_command")) {
+      for (int i = 0; args[i] != NULL; i++) {
+        free(args[i]);
+      }
+	  free(args);
+    }
+
   }
 
   /* FREE MALLOC'D */
-  if (args != NULL) {
-    for (int i = 0; args[i] != NULL; i++) {
-      free(args[i]);
-    }
-    free(args);
-  }
-  free(arg);
   free(pathname);
   free(prev_commands);
 
@@ -431,6 +429,7 @@ char* read_line(TetrisGameState game, char* pathname, Command** prev_commands,
       // edge case: \n or EOF entered right away
       if (idx == 0) {
         char* r = "bad_command";
+		free(buffer);
         return r;
       }
       buffer[idx] = '\0';
@@ -629,7 +628,7 @@ void visualize(TetrisGameState state) {
   printf("%s", "\n\e[38;2;255;60;0m+----+\e[38;2;255;255;255m\n\n");
 }
 
-/* We tried. You can uncomment and recompile if you're curious.
+/* LEFT IN IN CASE GRADE IS CURIOUS
 #define READ 0
 #define WRITE 1
 #define STDIN 0
@@ -655,9 +654,6 @@ void play(char* pathname) {
     // run tetris
     execl("tetris", pathname, (char*)0);
 
-    // close pipes #TODO: memory leak? do these actually get closed?
-    close(w_stdout[WRITE]);
-    close(w_stdin[READ]);
   } else {
     // we're going to use ncurses for getch; clearing of stdout shouldn't matter
     // because it's redirected?
@@ -949,7 +945,7 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
 
   else {
     printf(
-        "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN"
+        "\e[38;2;255;60;0mUNRECOGNIZED COMMAND GIVEN "
         "TO MODIFY. \e[38;2;255;255;255m\n");
     return;
   }
@@ -967,6 +963,11 @@ void modify(char** args, TetrisGameState* game, char** pathname) {
 }
 
 void help(char** args) {
+  if (args[1] == NULL) {
+	  printf("Possible commands are: modify, check, recover, rank, "
+			 "undo, visualize, info, switch, and exit.\n"); 
+	  return;
+  }
   if (!strcmp(args[1], "modify")) {
     printf(
         "This command calls the `modify` program with the current "
@@ -1041,117 +1042,33 @@ int switch_func(char** args, TetrisGameState* game, char** pathname) {
 }
 
 void rank(char* arg, char** args, char** pathname) {
-  bool one = false;
-  char* username = getlogin();
-
-  //set args if none given
   if (!args[1]) {
     args = parse_args_ranked(arg, *pathname);
     args[0] = "rank";
     args[1] = "score";
-    args[2] = "55";
+    args[2] = "10";
     args[3] = "\n";
-    one = true;
   }
   if (!args[2]) {
     args = parse_args_changes(arg, *pathname);
     args[2] = "10";
   }
-
-  //set up piping
   int p[2];
-  int p2[2];
-  check_neg(pipe(p2), "pipe failed in rank");
   check_neg((pipe(p)), "pipe failed in rank");
   pid_t pid = fork();
   check_neg(pid, "fork failed in rank");
-
-  //child
   if (pid == 0) {
     close(p[1]);
     dup2(p[0], STDIN_FILENO);
-    dup2(p2[1], fileno(stdout));
     args[0] = "/playpen/a5/rank";
     args[3] = "uplink";
     execve("/playpen/a5/rank", args, NULL);
-  } else { //parent
-    close(p2[1]);
+  } else {
     close(p[0]);
-    check_0((write(p[1], *pathname, strlen(*pathname))),
-            "write from shell to rank failed");
-    close(p[1]);
-    char output2[4096];
-    char** child_names2 = malloc(sizeof(char*));
-    child_names2[0] = malloc(sizeof(char) * 4096);
-    unsigned int inner2 = 0;
-    unsigned int outer2 = 0;
-    unsigned int count2 = 1;
-    ssize_t sizes2 = 0;
-    while ((sizes2 = read(p2[0], output2, 4096)) > 0) {
-      for (ssize_t g = 0; g < sizes2; ++g) {
-        child_names2[outer2][inclang-format -i --style=Google rank.cner2++] = output2[g];
-        if (output2[g] == '\n') {
-          child_names2[outer2++][inner2 - 1] = 0;
-          inner2 = 0;
-          if (outer2 >= count2) {
-            count2++;
-            child_names2 = realloc(child_names2, sizeof(char*) * count2);
-            child_names2[outer2] = malloc(sizeof(char) * 4096);
-          }
-        }
-      }
-    }
+    check_0((write(p[1], *pathname, strlen(*pathname))), "write from shell to rank failed");
     int ret;
     close(p[1]);
-    close(p2[0]);
     wait(&ret);
-
-	//print args
-    if (one) {
-      int current;
-      char new1[80];
-      snprintf(new1, sizeof(new1), "%s/%s", username, *pathname);
-      for (int i = 0; i < count2 - 1; i++) {
-        if (!strcmp(child_names2[i], new1)) {
-          current = i;
-          break;
-        }
-      }
-      if (current < 5 && current != 0) {
-        for (int b = 0; b < count2 + 6; b++) {
-          if (b == current) {
-            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
-          } else {
-            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
-          }
-        }
-      } else if (current > count2 - 5) {
-        for (int b = current - 5; b < count2 - 1; b++) {
-          if (b == current) {
-            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
-          } else {
-            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
-          }
-        }
-      } else if (current == 0) {
-        for (int b = 0; b < count2 - 1; b++) {
-            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
-        }
-		printf("%s%s%s\n", RED, "YOU ARE NOT ON THE LEADERBOARD.\n", WHITE);
-      } else {
-        for (int b = current - 5; b < current + 6; b++) {
-          if (b == current) {
-            printf("\033[1m%-3d\033[0m %s\n", b + 1, child_names2[b]);
-          } else {
-            printf("%s%-3d %s%s\n", RED, b + 1, child_names2[b], WHITE);
-          }
-        }
-      }
-    } else {
-      for (int i = 0; i < count2 - 1; i++) {
-        printf("%-3d %s\n", i + 1, child_names2[i]);
-      }
-    }
   }
 }
 

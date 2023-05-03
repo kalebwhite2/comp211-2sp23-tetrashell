@@ -42,7 +42,6 @@ Calling any of these modify commands will change the current quicksave as specif
 Rank is used to observe the current global leaderboard. For example, try `rank score 10`
 The aforementioned rank command will rank the top 10 quicksaves by score and print them out. Rank can also be specified to use lines.
 Quick rank is also implemented, so if you only type rank and a metric, such as score, it will print out the top 10 games by that metric from the leaderboard. 
-If the command given is just the word rank, our pretty rank implementation will print out the 5 quicksaves above yours, if possible, your quicksave file, and then the five quicksave files below your file, if possible.
 
 ### Check
 Check is implemented as suggested, printing out whether the file is legitimate or not.
@@ -83,6 +82,13 @@ The info, visualize and train functions are all implemented as suggested. To cal
 *`visualize`
 *`train`
 
+
+### Not Functional: Play
+An attempt was made to allow the shell user to play the current game. However, considering that the exec family of functions
+completely replaces the current process and that the authors were unable to locate such a function, an attempt was made to 
+implement play using a child process. However, the authors were unable to edit the tetris.c file in such a way that piping the parent's
+stdin in to it and it's stdout to the parent would give full functionality. If the user is curious, they are able to uncomment the 
+code in tetrashell.c and witness the comical results.
 
 # Enjoy TETRASHELL... THE SHELL OF YOUR DREAMS!
 

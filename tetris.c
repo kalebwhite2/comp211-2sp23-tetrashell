@@ -295,7 +295,6 @@ static void DrawFallingPiece(WINDOW *w, TetrisGameState *s) {
 
 // Writes the score, piece, and so on, in the game window.
 static void DisplayGameState(TetrisDisplay *windows, TetrisGameState *s) {
-  clear();
   DrawBoard(windows->game, s->board);
   DrawNextPiece(windows->next_piece, s->next_piece);
   DrawFallingPiece(windows->game, s);
@@ -624,6 +623,16 @@ static int UpdateGameState(TetrisDisplay *w, TetrisGameState *s, double delta,
   down_movement_threshold -= ((double) (s->lines / 10)) * 0.001;
 
   // Handle movement or rotation.
+  char potentially_key[3];
+  fread(&potentially_key, 3, 1, stdin); 
+  if (!strcmp(potentially_key, "\033[A")) {
+	  input_key = KEY_UP;
+  } if (!strcmp(potentially_key, "\033[C")) {
+	  input_key = KEY_RIGHT;
+  } if (!strcmp(potentially_key, "\033[D")) {
+	  input_key = KEY_LEFT;
+  }
+
   switch (input_key) {
   case (KEY_LEFT):
     TryMovingLeft(s);
@@ -731,7 +740,7 @@ static int PauseGame(TetrisDisplay *windows, TetrisGameState *s,
 // immediately.
 static int RunGame(TetrisDisplay *windows, int initial_quickload) {
   TetrisGameState s;
-  int input_key, quickload_and_pause, should_exit = 0, game_done = 0;
+  int input_key, quickload_and_pause, discard, should_exit = 0, game_done = 0;
   double time_delta, last_update_time, pre_pause_delta, down_movement_timer;
   down_movement_timer = 0.0;
   last_update_time = CurrentSeconds();
@@ -748,9 +757,11 @@ static int RunGame(TetrisDisplay *windows, int initial_quickload) {
   // waiting for keypresses.
   timeout(MAX_MS_PER_FRAME);
   while (!game_done) {
+	clear();
+	CreateWindows(windows); //ADDITION
     DisplayGameState(windows, &s);
     quickload_and_pause = 0;
-    fread(&input_key, sizeof(int), 1, stdin);
+	input_key = getch();
     time_delta = CurrentSeconds() - last_update_time;
     switch (input_key) {
     case 's':
@@ -813,8 +824,7 @@ int main(int argc, char **argv) {
     CheckCursesError(mvwprintw(windows.game, 9, 6, "Press space"));
     CheckCursesError(mvwprintw(windows.game, 10, 7, "to start!"));
     RefreshAllWindows(&windows);
-    fread(&input_key, sizeof(int), 1, stdin);
-    RefreshAllWindows(&windows); 
+    input_key = getch();
     switch (input_key) {
     case (' '):
       should_exit = RunGame(&windows, 0);
